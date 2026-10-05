@@ -1,0 +1,302 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   ACADEMIC AI DECISION-SUPPORT PLATFORM - CLEAN LIGHT THEME DESIGN SYSTEM
+   FOAI Subject: Intelligent EV Charging & Resource Management System
+   ========================================================================== */
+
+:root {
+  --bg-app: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F1F5F9;
+  --border-card: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --text-subtle: #94A3B8;
+  --primary-blue: #2563EB;
+  --primary-hover: #1D4ED8;
+  --accent-teal: #0D9488;
+  --accent-sky: #0284C7;
+  --accent-emerald: #059669;
+  --accent-amber: #D97706;
+  --accent-crimson: #DC2626;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+  min-height: 100vh;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Clear Dark Theme Overrides */
+html.dark, html.dark body, html.dark #root, html.dark main {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+/* Clean Professional Typography */
+h1, h2, h3, h4, h5, h6 {
+  color: #0F172A;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Monospace & Tabular Numbers for Algorithms and Math */
+code, pre, .font-mono, [class*="font-mono"] {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', Menlo, monospace !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Crisp Clean Card Utilities */
+.ai-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+}
+
+.ai-card-flat {
+  background-color: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+.ai-card-subtle {
+  background-color: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+/* Backward compatibility for existing components using .glass-panel */
+.glass-panel {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
+  border-radius: 8px !important;
+  color: #0F172A !important;
+}
+
+.glass-panel-hover:hover {
+  border-color: #93C5FD !important;
+  box-shadow: 0 4px 12px 0 rgba(37, 99, 235, 0.08) !important;
+}
+
+/* Table Utilities */
+.ai-table-container {
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  background-color: #FFFFFF;
+}
+
+.ai-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+
+.ai-table th {
+  background-color: #F8FAFC;
+  color: #475569;
+  font-weight: 600;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.ai-table td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid #F1F5F9;
+  color: #1E293B;
+}
+
+.ai-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ai-table tr:hover td {
+  background-color: #F8FAFC;
+}
+
+/* Badges */
+.badge-blue {
+  background-color: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.badge-teal {
+  background-color: #F0FDFA;
+  color: #0F766E;
+  border: 1px solid #99F6E4;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.badge-emerald {
+  background-color: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.badge-amber {
+  background-color: #FFFBEB;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.badge-rose {
+  background-color: #FFF1F2;
+  color: #BE123C;
+  border: 1px solid #FECDD3;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.badge-slate {
+  background-color: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  font-weight: 600;
+  border: 1px solid #1D4ED8;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: #1D4ED8;
+}
+
+.btn-secondary {
+  background-color: #FFFFFF;
+  color: #334155;
+  font-weight: 600;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: #F8FAFC;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+/* Form Controls */
+.form-input {
+  width: 100%;
+  background-color: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #0F172A;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 0.375rem;
+}
+
+/* Minimal Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Leaflet Map & Light Popup Styling */
+.leaflet-container {
+  background-color: #E2E8F0 !important;
+  font-family: inherit !important;
+  border-radius: 6px;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  font-size: 0.8125rem;
+}
+
+.leaflet-popup-tip {
+  background: #FFFFFF !important;
+}
