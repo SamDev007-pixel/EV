@@ -387,6 +387,13 @@ class CSPSolver:
         self.variable_selection_log = []
         self.ac3_pruned_domains = {}
 
+        # Bounded-search state for this run (see solve(max_search_nodes=..., max_search_seconds=...))
+        self.nodes_explored = 0
+        self.search_budget_exhausted = False
+        self.max_search_nodes = int(max_search_nodes)
+        self.max_search_seconds = float(max_search_seconds)
+        self._search_start = start_time
+
         # 1. Generate domains
         domains = self.generate_candidate_domains(problem)
 
