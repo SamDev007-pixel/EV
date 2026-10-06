@@ -1,4 +1,34 @@
+"""
+User-supplied real Indian charging-station metadata (locations, operators, port counts).
+
+DATA HONESTY NOTE
+-----------------
+These records describe **public station metadata** (location, operator, connector types,
+published tariff). Occupancy, availability and live load are NOT part of this dataset.
+
+Tariffs are published in Indian Rupees per kWh. The simulation keeps a single accounting
+unit (USD), so `PRICE_CURRENCY` is tagged here and converted once when the station is
+loaded into the environment (see `SimulationEngine.reset_environment`). Keeping the source
+currency explicit avoids mixing ₹/kWh and $/kWh inside the same cost calculation.
+"""
+
 from typing import List, Dict, Any
+
+#: Published tariffs in this dataset are quoted in Indian Rupees per kWh.
+PRICE_CURRENCY = "INR"
+
+#: Fixed conversion rate used for accounting. Documented, not market-live: 1 USD = 85 INR.
+INR_PER_USD = 85.0
+
+
+def price_in_usd(station_metadata: Dict[str, Any]) -> float:
+    """Convert a dataset tariff into the simulation accounting unit (USD per kWh)."""
+    price = float(station_metadata.get("price_per_kwh", 0.0))
+    currency = station_metadata.get("price_currency", PRICE_CURRENCY)
+    if currency == "INR":
+        return round(price / INR_PER_USD, 4)
+    return price
+
 
 INDIAN_USER_STATIONS: List[Dict[str, Any]] = [
     {
@@ -249,3 +279,8 @@ INDIAN_USER_STATIONS: List[Dict[str, Any]] = [
         "data_source": "OPENSTREETMAP_VERIFIED"
     }
 ]
+
+# Every record in this dataset is quoted in INR; tag it explicitly so that the
+# conversion is verifiable rather than implicit.
+for _station in INDIAN_USER_STATIONS:
+    _station.setdefault("price_currency", PRICE_CURRENCY)

@@ -32,6 +32,10 @@ class CSPEVVariable(BaseModel):
     departure_deadline: int = 120
     location: Dict[str, float] = Field(default_factory=lambda: {"x": 0.0, "y": 0.0})
     charger_type_needed: str = "DC_FAST"
+    # Optional restriction: when non-empty, only these stations are considered when the
+    # candidate domain is generated. Used by the workflow to pin the EV to the station that
+    # the search step selected, so the CSP schedules the charger/time slot at that station.
+    allowed_station_ids: List[str] = Field(default_factory=list)
     domain: List[CSPDomainValue] = Field(default_factory=list)
 
     @property

@@ -450,6 +450,7 @@ def run_logic_backward_chain(req: LogicBackwardChainRequest):
     }
 
 
+@router.post("/logic/dpll/solve")
 @router.post("/logic/dpll-verify")
 def run_dpll_verification(req: DPLLVerifyRequest):
     from app.knowledge.propositional_dpll import PropositionalDPLL
@@ -593,10 +594,10 @@ def get_search_network():
 
 @router.post("/search/compare-algorithms")
 def compare_search_algorithms(scenario: EVScenario):
+    """Compare BFS / DFS / UCS / GBFS / A* on the identical live search problem."""
     current_stations = [s.model_dump() for s in sim_engine.stations.values()]
     engine = StationSelectorEngine()
-    # We can pass scenario directly
-    return engine.run_algorithm_comparison(scenario)
+    return engine.run_algorithm_comparison(scenario, stations_override=current_stations)
 
 
 @router.post("/search/recommend-station")
@@ -694,21 +695,6 @@ def formulate_problem_endpoint(req: ProblemFormulationAPIRequest):
     }
 
 
-@router.get("/search/network")
-def get_search_network():
-    """Returns the topological graph of stations and road waypoints."""
-    from app.search.graph import ChargingNetworkGraph
-    graph = ChargingNetworkGraph.create_default_network()
-    return {
-        "nodes": [n.model_dump() for n in graph.nodes.values()],
-        "edges": [
-            edge.model_dump()
-            for edge_list in graph.adjacency.values()
-            for edge in edge_list
-        ]
-    }
-
-
 @router.post("/search/solve")
 @router.post("/search/recommend-station")
 def solve_search_path(req: SearchSolveRequest):
@@ -723,7 +709,8 @@ def solve_search_path(req: SearchSolveRequest):
         charger_type_needed=req.charger_type_needed
     )
     engine = StationSelectorEngine()
-    comparison = engine.run_algorithm_comparison(scenario)
+    current_stations = [st.model_dump() for st in sim_engine.stations.values()]
+    comparison = engine.run_algorithm_comparison(scenario, stations_override=current_stations)
     matrix = comparison.get("comparison_matrix", [])
     
     algo_name = req.algorithm.upper()
@@ -731,6 +718,7 @@ def solve_search_path(req: SearchSolveRequest):
 
     return {
         "input": req.model_dump(),
+        "station_source": comparison.get("station_source", "STATIC_DEFAULT_NETWORK"),
         "algorithm": matching_result.get("algorithm", req.algorithm),
         "result": matching_result,
         "metrics": {
@@ -759,19 +747,49 @@ def compare_all_search(req: SearchCompareRequest):
         charger_type_needed=req.charger_type_needed
     )
     engine = StationSelectorEngine()
-    comparison = engine.run_algorithm_comparison(scenario)
+    current_stations = [st.model_dump() for st in sim_engine.stations.values()]
+    comparison = engine.run_algorithm_comparison(scenario, stations_override=current_stations)
     matrix = comparison.get("comparison_matrix", [])
+
+    # Measured facts about the run, so the UI never has to state a claim it cannot verify
+    ucs_cost = next((m.get("path_cost") for m in matrix if m.get("algorithm") == "UCS" and m.get("success")), None)
+    astar_cost = next((m.get("path_cost") for m in matrix if m.get("algorithm") == "A* Search" and m.get("success")), None)
+    ucs_nodes = next((m.get("nodes_explored") for m in matrix if m.get("algorithm") == "UCS"), None)
+    astar_nodes = next((m.get("nodes_explored") for m in matrix if m.get("algorithm") == "A* Search"), None)
+
+    optimal = None
+    if ucs_cost is not None and astar_cost is not None:
+        optimal = abs(ucs_cost - astar_cost) <= 1e-6
 
     return {
         "input": req.model_dump(),
+        "station_source": comparison.get("station_source", "STATIC_DEFAULT_NETWORK"),
         "algorithm": "Comparative Classical Search (BFS, DFS, UCS, GBFS, A*)",
         "result": matrix,
         "comparison_matrix": matrix,
         "metrics": {
             "algorithms_evaluated": len(matrix),
-            "optimal_path_cost": min((m.get("path_cost", float('inf')) for m in matrix if m.get("success")), default=0.0)
+            "optimal_path_cost": min((m.get("path_cost", float('inf')) for m in matrix if m.get("success")), default=0.0),
+            "astar_matches_ucs_optimum": optimal,
+            "ucs_nodes_explored": ucs_nodes,
+            "astar_nodes_explored": astar_nodes,
+            "astar_node_saving_pct": (
+                round((1 - astar_nodes / ucs_nodes) * 100.0, 1)
+                if ucs_nodes and astar_nodes and ucs_nodes > 0 else None
+            ),
         },
-        "explanation": "Comparative matrix benchmarks all 5 classical search algorithms on the same graph state. UCS and A* find optimal cost paths, with A* expanding fewer nodes thanks to the admissible heuristic."
+        "explanation": (
+            "All five classical search algorithms were executed on the same live graph state. "
+            + (
+                f"A* returned the same optimal path cost as UCS ({astar_cost:.2f}) while expanding "
+                f"{astar_nodes} nodes versus {ucs_nodes} for UCS. Greedy best-first expands the fewest nodes "
+                "because it uses h(n) only, which is why it can return a more expensive path. DFS returns a "
+                "goal path but gives no optimality guarantee."
+                if optimal else
+                "A* and UCS did not return the same cost on this instance, which would indicate a non-admissible "
+                "heuristic - inspect the comparison matrix."
+            )
+        )
     }
 
 
@@ -864,6 +882,10 @@ def list_csp_scenarios():
         {"id": "CHARGER_SHORTAGE", "name": "Charger Shortage", "description": "Multiple EVs competing for limited physical chargers; tests time-staggering."},
         {"id": "GRID_CAPACITY_SHORTAGE", "name": "Grid Capacity Shortage", "description": "Transformer capacity restricted to 100 kW; tests power allocation ceiling."},
         {"id": "DEADLINE_CONFLICTS", "name": "Deadline Conflicts", "description": "Tight departure deadlines arriving simultaneously."},
+        {"id": "TIGHT_WINDOW_BACKTRACKING", "name": "Tight Window (Backtracking Demonstration)",
+         "description": "One shared 50 kW charger and three staggered deadlines: naive depth-first assignment dead-ends and backtracks, while MRV + LCV + forward checking reach the solution without backtracking."},
+        {"id": "PROPAGATION_INFEASIBLE", "name": "Propagation Proves Infeasible (AC-3)",
+         "description": "Four sessions need 150 charger-minutes inside a 120 minute window. AC-3 arc consistency empties a domain and proves unsatisfiability before the search starts."},
         {"id": "NO_FEASIBLE_SOLUTION", "name": "No Feasible Solution (Unfeasible)", "description": "Station outage and impossible deadlines triggering constraint violation diagnosis."}
     ]
 
@@ -1125,6 +1147,39 @@ def get_osm_pois(lat: float, lon: float, radius: int = 2500, category: str = "al
         radius_m=radius, 
         category=category
     )
+
+
+# --- PEAS AGENT-ENVIRONMENT SPECIFICATION (FOAI UNIT I) ---
+
+@router.get("/peas")
+def get_peas_specification():
+    """
+    Unit I: PEAS description of the charging-coordinator agent.
+
+    Returns the formal Performance / Environment / Actuators / Sensors specification
+    together with the metrics that the running environment actually measures
+    (taken from the live simulation, not from constants).
+    """
+    from app.core.peas import get_default_peas_spec
+    spec = get_default_peas_spec()
+    return {
+        "specification": spec.model_dump(),
+        "measured_metrics": sim_engine.peas_metrics.model_dump(),
+        "environment_classification": {
+            "observability": "PARTIALLY_OBSERVABLE (station occupancy/faults and future arrivals are not known in advance)",
+            "determinism": "NONDETERMINISTIC in practice (stochastic arrivals, station faults, demand spikes)",
+            "episodicity": "SEQUENTIAL (a scheduling decision changes the state seen by later decisions)",
+            "dynamism": "DYNAMIC (the environment changes while the agent deliberates)",
+            "agents": "MULTI_AGENT (EV agents, station agent, grid agent, energy agent, coordinator)",
+            "continuity": "DISCRETE (discrete time ticks, discrete charging slots)",
+        },
+        "data_provenance": {
+            "station_metadata": "REAL (Open Charge Map / OpenStreetMap public station records)",
+            "occupancy_and_faults": "SIMULATED",
+            "user_inputs": "USER INPUT (EV request form)",
+            "decisions": "CLASSICAL AI COMPUTATION (search, CSP, logic, game theory)",
+        },
+    }
 
 
 # --- EXPLAINABLE AI / DECISION EXPLANATION ENDPOINTS ---

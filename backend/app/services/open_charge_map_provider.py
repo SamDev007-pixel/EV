@@ -59,7 +59,7 @@ class OpenChargeMapProvider:
                 "statusCode": 401,
                 "stationCount": 0,
                 "responseTimeMs": 0,
-                "message": "OPENCHARGEMAP_API_KEY is missing in server environment variables.",
+                "message": "Charging-station metadata provider API key is missing in the server environment.",
                 "lastSync": None
             }
             
