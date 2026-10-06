@@ -18,4 +18,3 @@ export { default as SyllabusMappingView } from './views/SyllabusMappingView';
 // Interactive Network & Pipeline Tools
 export { default as LiveNetworkMap } from './views/LiveNetworkMap';
 export { default as PEASMatrixView } from './views/PEASMatrixView';
-export { default as DynamicScenarioControlPanel } from './views/DynamicScenarioControlPanel';
