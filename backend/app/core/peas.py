@@ -3,38 +3,46 @@ from typing import List, Dict, Any
 
 
 class PEASSpecification(BaseModel):
-    agent_name: str = "Central Intelligent EV & Resource Coordinator Agent"
-    
+    """
+    PEAS description of the coordinator agent (FOAI Unit I).
+
+    HONESTY NOTE: this is a *software* agent. Its "sensors" are data feeds produced by the
+    application itself - the request form, the simulation state and the knowledge base. No
+    physical sensor, vehicle telemetry unit or charging hardware exists anywhere in the
+    project, and the "actuators" are decisions written into the simulation state.
+    """
+
+    agent_name: str = "EV Charging Coordinator Agent"
+
     performance_measure: List[str] = [
-        "Minimize average EV queuing & charging waiting time (minutes)",
-        "Zero grid transformer capacity overload violations (Maintain load < 100%)",
-        "Maximize Charging Station operator utilization & revenue",
-        "100% priority fulfillment for Emergency EVs (Ambulance / Fire Services)",
-        "Maximize renewable solar self-consumption & minimize peak grid draw"
+        "Minimise average EV queuing & charging waiting time (minutes) - measured by the simulation clock",
+        "Avoid grid transformer overload incidents (keep modelled load below the 450 kW rating)",
+        "Maximise charger utilisation and revenue in the modelled station network",
+        "Serve emergency-priority vehicles first (measured: emergency EVs completed)",
+        "Meet each vehicle's charging deadline (measured: timed-out EV count)",
     ]
-    
+
     environment: List[str] = [
-        "Distributed network of EV Charging Stations (AC, DC Fast, Ultra-Fast)",
-        "Dynamic stream of arriving EVs with diverse battery sizes & deadlines",
-        "Local power grid transformer feed with peak/off-peak pricing",
-        "Solar PV panels & stationary energy storage batteries",
-        "Unpredictable events: station outages, sudden demand spikes, emergency arrivals"
+        "A network of 22 charging stations / 76 chargers with static public metadata and simulated occupancy",
+        "A stream of arriving EVs with different battery sizes, connector needs and deadlines",
+        "A modelled 450 kW grid transformer feed with a published per-station tariff",
+        "Simulated station faults and demand spikes injected by the user or the scenario runner",
+        "A partially observable, dynamic environment: future arrivals and station faults are unknown in advance",
     ]
-    
+
     actuators: List[str] = [
-        "EV-to-Station & Port Assignment",
-        "Dynamic Time-Slot Scheduling (A* Search & CSP Backtracking)",
-        "Charging Power Allocation (kW throttles / boost)",
-        "Emergency Priority Queue Preemption",
-        "Grid Energy Shedding & Battery Storage Discharge Trigger"
+        "Assign an EV request to a station and a charger",
+        "Schedule the charging time slot (CSP backtracking search)",
+        "Set the charging power for the session (kW throttle)",
+        "Pre-empt the queue for emergency-priority vehicles",
+        "Defer or reject a session when the modelled transformer headroom is exhausted",
     ]
-    
+
     sensors: List[str] = [
-        "EV Battery Telemetry (SoC %, Max kW rate, Arrival time, Deadline)",
-        "Station Port Occupancy & Health Sensors (Fault/Operational)",
-        "Grid Transformer Load Meters (kW total draw)",
-        "Solar PV Generation Sensors",
-        "Dynamic Electricity Tariff Feed ($/kWh)"
+        "User request fields (state of charge, deadline, priority, connector, location) - USER INPUT",
+        "Station and charger status read from the environment snapshot - SIMULATED DATA",
+        "Grid transformer load read from the environment snapshot - SIMULATED DATA",
+        "Knowledge-base facts derived from the above by the rule engine - CLASSICAL AI COMPUTATION",
     ]
 
 

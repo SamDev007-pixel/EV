@@ -69,7 +69,8 @@ class SimulationEngine:
             )
         }
         
-        # 3. Real Open Charge Map Stations & Core Simulation Hubs (Bengaluru)
+        # 3. Station catalogue: 3 seed hubs + the public-metadata station dataset.
+        #    (Static data snapshot - no external API is queried at runtime.)
         self.stations = {}
         self.chargers = {}
         
@@ -160,65 +161,6 @@ class SimulationEngine:
                 longitude=user_st["longitude"]
             )
             self.stations[st_id] = station
-
-        # Fetch & Merge real Open Charge Map POI stations across India
-        try:
-            from app.services.open_charge_map_provider import OpenChargeMapProvider
-            from app.models.open_charge_map_adapter import OpenChargeMapAdapter
-            
-            raw_ocm = OpenChargeMapProvider.fetch_raw_poi_data(
-                country_code="IN", 
-                max_results=50
-            )
-            ocm_normalized = OpenChargeMapAdapter.normalize_station_list(raw_ocm.get("data", []))
-            
-            for ext_st in ocm_normalized:
-                st_id = ext_st.stationId
-                if st_id in self.stations:
-                    continue
-                    
-                station_chargers = []
-                num_chargers = max(2, ext_st.numberOfConnections)
-                
-                for i in range(1, num_chargers + 1):
-                    c_id = f"{st_id}-CH-{i}"
-                    c_type = ChargerType.ULTRA_FAST if i == 1 else ChargerType.DC_FAST
-                    power = ext_st.chargingPowerKW if i == 1 else 50.0
-                    
-                    charger = ChargerModel(
-                        id=c_id,
-                        stationId=st_id,
-                        chargerType=c_type,
-                        maximumPower=power,
-                        currentStatus=ChargerStatus.AVAILABLE
-                    )
-                    self.chargers[c_id] = charger
-                    station_chargers.append(charger)
-
-                grid_x = round(((ext_st.longitude - 77.5946) * 100) + 5.0, 2)
-                grid_y = round(((ext_st.latitude - 12.9716) * 100) + 5.0, 2)
-                grid_x = max(1.0, min(9.5, grid_x))
-                grid_y = max(1.0, min(9.5, grid_y))
-
-                station = StationModel(
-                    id=st_id,
-                    name=ext_st.stationName,
-                    location={"x": grid_x, "y": grid_y},
-                    numberOfChargers=len(station_chargers),
-                    chargingPower=ext_st.chargingPowerKW,
-                    energyPrice=0.25,
-                    operatingStatus=StationOperatingStatus.OPERATIONAL,
-                    chargers=station_chargers,
-                    dataSource="OPEN_CHARGE_MAP",
-                    availabilityMode="EXTERNAL_METADATA",
-                    operatorName=ext_st.operator,
-                    address=ext_st.address,
-                    latitude=ext_st.latitude,
-                    longitude=ext_st.longitude
-                )
-                self.stations[st_id] = station
-        except Exception:
-            pass
 
         # 4. Seed EVs
         self.evs = {}
@@ -581,6 +523,7 @@ class SimulationEngine:
                 ev.status = EVStatus.CHARGING
                 ev.assignedStationId = station.id
                 ev.assignedChargerId = charger.id
+                ev.travelDistanceKm = round(self._distance_to_station(ev, station), 2)
                 assigned = True
                 break
 

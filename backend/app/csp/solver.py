@@ -30,6 +30,10 @@ class CSPSearchStats(BaseModel):
     forward_check_wipeouts: int = 0
     value_choices_rejected: int = 0
 
+    # --- Bounded-search reporting (a large infeasible instance must not hang the server) ---
+    search_budget_nodes: int = 0
+    search_budget_exhausted: bool = False
+
 
 class CSPSolverResult(BaseModel):
     is_feasible: bool
@@ -98,6 +102,9 @@ class CSPSolver:
         self.backtracking_steps: List[Dict[str, Any]] = []
         self.variable_selection_log: List[Dict[str, Any]] = []
         self.ac3_pruned_domains: Dict[str, int] = {}
+        self.nodes_explored = 0
+        self.search_budget_exhausted = False
+        self.max_search_nodes = 120_000  # overridden per run by solve(max_search_nodes=...)
 
         # Bound the trace so that API responses stay small on large instances.
         self.max_trace_entries = 400
@@ -355,6 +362,8 @@ class CSPSolver:
         find_all_solutions: bool = False,
         max_solutions: int = 5,
         enable_lcv: bool = True,
+        max_search_nodes: int = 120_000,
+        max_search_seconds: float = 5.0,
         **kwargs
     ) -> CSPSolverResult:
         """
@@ -415,7 +424,9 @@ class CSPSolver:
                         ac3_values_pruned=self.ac3_values_pruned,
                         forward_check_prunes=self.forward_check_prunes,
                         forward_check_wipeouts=self.forward_check_wipeouts,
-                        value_choices_rejected=self.value_choices_rejected
+                        value_choices_rejected=self.value_choices_rejected,
+                        search_budget_nodes=self.nodes_explored,
+                        search_budget_exhausted=False
                     ),
                     initial_domains=initial_domain_snapshot,
                     ac3_pruned_domains=self.ac3_pruned_domains,
@@ -435,6 +446,19 @@ class CSPSolver:
         def backtrack_recursive(current_assignment: CSPAssignment, current_domains: Dict[str, List[CSPDomainValue]], depth: int):
             if depth > self.max_depth_reached:
                 self.max_depth_reached = depth
+
+            # Bounded search: a classical depth-limited/budgeted search. Without a budget, an
+            # infeasible instance with a large domain space can keep backtracking for minutes
+            # (measured: 771k backtracks / 50M constraint checks on a 6-EV spike scenario).
+            self.nodes_explored += 1
+            if self.nodes_explored > self.max_search_nodes:
+                self.search_budget_exhausted = True
+                return
+            # A wall-clock cap as well: node cost is not uniform (MRV/LCV ordering is O(domain)),
+            # so a node budget alone can still take a minute on large instances.
+            if (self.nodes_explored & 0xFF) == 0 and (time.perf_counter() - self._search_start) > self.max_search_seconds:
+                self.search_budget_exhausted = True
+                return
 
             if len(current_assignment.assignments) == len(problem.variables):
                 found_assignments.append(current_assignment.copy())
@@ -545,10 +569,20 @@ class CSPSolver:
                 f"Feasible CSP schedule generated successfully. Solved in {exec_time:.2f} ms with {self.backtracks_count} backtracks. "
                 f"{best_score.explanation}"
             )
+        elif self.search_budget_exhausted:
+            explanation = (
+                f"No solution was found within the search budget "
+                f"({self.max_search_nodes} nodes / {self.max_search_seconds:g} s; explored {self.nodes_explored} nodes with "
+                f"{self.backtracks_count} backtracks and {self.constraint_checks_count} constraint checks). "
+                f"The instance is therefore UNKNOWN rather than proven infeasible: the budget was exhausted "
+                f"before the search space was covered. Raise max_search_nodes to search further. "
+                f"Last constraint conflicts seen: {', '.join(list(self.violated_reasons)[:3]) or 'none recorded'}."
+            )
         else:
             explanation = (
-                f"No feasible CSP schedule exists under current hard constraints. "
-                f"Backtracked {self.backtracks_count} times and checked {self.constraint_checks_count} constraints. "
+                f"No feasible CSP schedule exists under current hard constraints. The search space was "
+                f"exhausted without a solution (proven infeasible): "
+                f"{self.backtracks_count} backtracks, {self.constraint_checks_count} constraint checks. "
                 f"Violated constraints summary: {', '.join(list(self.violated_reasons)[:3]) or 'Deadline / Power conflicts'}."
             )
 
@@ -575,7 +609,9 @@ class CSPSolver:
                 ac3_values_pruned=self.ac3_values_pruned,
                 forward_check_prunes=self.forward_check_prunes,
                 forward_check_wipeouts=self.forward_check_wipeouts,
-                value_choices_rejected=self.value_choices_rejected
+                value_choices_rejected=self.value_choices_rejected,
+                search_budget_nodes=self.nodes_explored,
+                search_budget_exhausted=self.search_budget_exhausted
             ),
             initial_domains=initial_domain_snapshot,
             ac3_pruned_domains=self.ac3_pruned_domains,

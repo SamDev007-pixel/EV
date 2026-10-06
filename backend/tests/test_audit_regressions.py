@@ -247,7 +247,10 @@ def test_peas_endpoint_exposes_spec_and_measured_metrics():
     assert set(payload["specification"].keys()) >= {"performance_measure", "environment", "actuators", "sensors"}
     assert "measured_metrics" in payload
     assert payload["environment_classification"]["observability"].startswith("PARTIALLY_OBSERVABLE")
-    assert payload["data_provenance"]["occupancy_and_faults"] == "SIMULATED"
+    assert payload["data_provenance"]["occupancy_and_faults"].startswith("SIMULATED")
+    # the endpoint must state that station metadata is a static snapshot, not a live feed
+    assert "SNAPSHOT" in payload["data_provenance"]["station_metadata"].upper()
+    assert "no live api call" in payload["data_provenance"]["station_metadata"].lower()
 
 
 def test_new_csp_scenarios_are_listed_by_the_api():

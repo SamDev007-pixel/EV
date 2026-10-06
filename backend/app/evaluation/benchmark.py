@@ -7,16 +7,17 @@ result is asserted: if a policy performs worse than a baseline on a given seed,
 the reported table shows exactly that.
 
 Data provenance:
-- Environment (stations, chargers, transformer rating, seeded EV fleet): SIMULATED DATA
-  (station metadata originates from real Open Charge Map / OpenStreetMap records, while
-  occupancy, faults and battery levels are simulation state).
+- Environment (stations, chargers, transformer rating, seeded EV fleet): SIMULATED DATA.
+  Station metadata (location, operator, port count, published tariff) is a static snapshot of
+  public station records bundled with the repository; no external API is called at runtime.
+  Occupancy, faults and battery levels are simulation state.
 - Scheduling policies: CLASSICAL AI / CLASSICAL HEURISTIC COMPUTATION (no learning).
 - Reported metrics: MEASURED from the simulation run (see `data_provenance` field).
 """
 
 import time
 import math
-from typing import List, Dict, Any
+from typing import Optional, List, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -34,7 +35,7 @@ class StrategyEvaluationResult(BaseModel):
 
     # --- Measured metrics ---
     avg_wait_time_min: float
-    avg_travel_dist_km: float
+    avg_travel_dist_km: Optional[float] = None  # None = policy assigned no station (not measurable)
     avg_charging_cost_usd: float
     station_utilization_pct: float
     grid_overload_incidents: int
@@ -169,25 +170,20 @@ class BenchmarkEvaluator:
         # Waiting time: measured per EV by the simulation clock
         wait_values = [ev.waitTimeMin for ev in ev_list]
         avg_wait = round(sum(wait_values) / max(1, total_evs), 1)
+        # NOTE: simulated vehicles all arrive at tick 0, so a policy that admits on arrival
+        # (FCFS/nearest) records a ~1 minute wait; the grid-safe policy defers sessions and
+        # therefore shows a longer, measured wait. Both numbers come from the EV clock.
 
         # Charging cost: measured energy billed to each EV (single accounting unit, USD)
         cost_values = [ev.totalCostUSD for ev in ev_list if ev.totalCostUSD > 0]
         avg_cost = round(sum(cost_values) / max(1, len(cost_values)), 2) if cost_values else 0.0
 
-        # Travel distance: straight-line distance from the EV's start location to the
-        # station it was actually assigned to (only for EVs that received an assignment).
-        distances = []
-        for ev in ev_list:
-            if not ev.assignedStationId:
-                continue
-            station = sim.stations.get(ev.assignedStationId)
-            if not station:
-                continue
-            loc = ev.currentLocation or {"x": 0.0, "y": 0.0}
-            st_loc = station.location or {"x": 0.0, "y": 0.0}
-            distances.append(math.hypot(loc.get("x", 0.0) - st_loc.get("x", 0.0),
-                                        loc.get("y", 0.0) - st_loc.get("y", 0.0)))
-        avg_distance = round(sum(distances) / len(distances), 2) if distances else 0.0
+        # Travel distance: distance to the assigned station, recorded by the engine at
+        # assignment time (assignedStationId is cleared when a session completes, so the
+        # value cannot be reconstructed afterwards). If a policy never assigned a station,
+        # the average is unknown - reported as None rather than a misleading 0.0.
+        distances = [ev.travelDistanceKm for ev in ev_list if ev.travelDistanceKm > 0]
+        avg_distance = round(sum(distances) / len(distances), 2) if distances else None
 
         mean_util = round(sum(utilisation_samples) / max(1, len(utilisation_samples)), 1)
 
@@ -267,7 +263,11 @@ class BenchmarkEvaluator:
                     f"Nearest-station assignment minimises travel distance "
                     f"({nearest['avg_travel_dist_km']} km measured vs {proposed['avg_travel_dist_km']} km for the "
                     f"proposed policy) but ignores congestion and transformer headroom, which is why it is used "
-                    f"in this benchmark as a single-objective baseline."
+                    f"in this benchmark as a single-objective baseline. Travel distance is captured at assignment "
+                    f"time by the simulation engine."
+                    if nearest.get('avg_travel_dist_km') is not None and proposed.get('avg_travel_dist_km') is not None
+                    else "Travel distance is captured at assignment time by the simulation engine; on this run at "
+                         "least one policy left no measurable assignment distance, so no comparison is reported."
                 ),
             })
 
