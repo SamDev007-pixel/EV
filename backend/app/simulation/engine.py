@@ -69,7 +69,8 @@ class SimulationEngine:
             )
         }
         
-        # 3. Real Open Charge Map Stations & Core Simulation Hubs (Bengaluru)
+        # 3. Station catalogue: 3 seed hubs + the public-metadata station dataset.
+        #    (Static data snapshot - no external API is queried at runtime.)
         self.stations = {}
         self.chargers = {}
         
@@ -116,7 +117,7 @@ class SimulationEngine:
             self.stations[st_id] = station
 
         # Load User-Supplied Real Indian Charging Stations (Shell, BPCL, Ather, Jio-bp, Zeon, ChargeZone, Hyundai)
-        from app.services.custom_station_dataset import INDIAN_USER_STATIONS
+        from app.services.custom_station_dataset import INDIAN_USER_STATIONS, price_in_usd
         for user_st in INDIAN_USER_STATIONS:
             st_id = user_st["id"]
             station_chargers = []
@@ -148,7 +149,8 @@ class SimulationEngine:
                 location={"x": grid_x, "y": grid_y},
                 numberOfChargers=len(station_chargers),
                 chargingPower=user_st["charging_power_kw"],
-                energyPrice=user_st.get("price_per_kwh", 16.0),
+                energyPrice=price_in_usd(user_st),
+                priceCurrency="USD",  # dataset tariffs converted to the accounting unit on load
                 operatingStatus=StationOperatingStatus.OPERATIONAL,
                 chargers=station_chargers,
                 dataSource=user_st.get("data_source", "OPEN_CHARGE_MAP"),
@@ -159,65 +161,6 @@ class SimulationEngine:
                 longitude=user_st["longitude"]
             )
             self.stations[st_id] = station
-
-        # Fetch & Merge real Open Charge Map POI stations across India
-        try:
-            from app.services.open_charge_map_provider import OpenChargeMapProvider
-            from app.models.open_charge_map_adapter import OpenChargeMapAdapter
-            
-            raw_ocm = OpenChargeMapProvider.fetch_raw_poi_data(
-                country_code="IN", 
-                max_results=50
-            )
-            ocm_normalized = OpenChargeMapAdapter.normalize_station_list(raw_ocm.get("data", []))
-            
-            for ext_st in ocm_normalized:
-                st_id = ext_st.stationId
-                if st_id in self.stations:
-                    continue
-                    
-                station_chargers = []
-                num_chargers = max(2, ext_st.numberOfConnections)
-                
-                for i in range(1, num_chargers + 1):
-                    c_id = f"{st_id}-CH-{i}"
-                    c_type = ChargerType.ULTRA_FAST if i == 1 else ChargerType.DC_FAST
-                    power = ext_st.chargingPowerKW if i == 1 else 50.0
-                    
-                    charger = ChargerModel(
-                        id=c_id,
-                        stationId=st_id,
-                        chargerType=c_type,
-                        maximumPower=power,
-                        currentStatus=ChargerStatus.AVAILABLE
-                    )
-                    self.chargers[c_id] = charger
-                    station_chargers.append(charger)
-
-                grid_x = round(((ext_st.longitude - 77.5946) * 100) + 5.0, 2)
-                grid_y = round(((ext_st.latitude - 12.9716) * 100) + 5.0, 2)
-                grid_x = max(1.0, min(9.5, grid_x))
-                grid_y = max(1.0, min(9.5, grid_y))
-
-                station = StationModel(
-                    id=st_id,
-                    name=ext_st.stationName,
-                    location={"x": grid_x, "y": grid_y},
-                    numberOfChargers=len(station_chargers),
-                    chargingPower=ext_st.chargingPowerKW,
-                    energyPrice=0.25,
-                    operatingStatus=StationOperatingStatus.OPERATIONAL,
-                    chargers=station_chargers,
-                    dataSource="OPEN_CHARGE_MAP",
-                    availabilityMode="EXTERNAL_METADATA",
-                    operatorName=ext_st.operator,
-                    address=ext_st.address,
-                    latitude=ext_st.latitude,
-                    longitude=ext_st.longitude
-                )
-                self.stations[st_id] = station
-        except Exception:
-            pass
 
         # 4. Seed EVs
         self.evs = {}
@@ -424,7 +367,25 @@ class SimulationEngine:
         self.strategy_name = strategy_name
         self._apply_strategy()
 
+    def _distance_to_station(self, ev: EVModel, station: StationModel) -> float:
+        """Euclidean distance (km) from the EV's current location to a station."""
+        loc = ev.currentLocation or {"x": 0.0, "y": 0.0}
+        st_loc = station.location or {"x": 0.0, "y": 0.0}
+        return math.hypot(loc.get("x", 0.0) - st_loc.get("x", 0.0), loc.get("y", 0.0) - st_loc.get("y", 0.0))
+
     def _apply_strategy(self):
+        """
+        Assign queued EVs to chargers using the currently selected scheduling policy.
+
+        Implemented policies (all deterministic, no learning):
+        - FCFS_BASELINE / BALANCED : strict arrival order, first available charger, no throttling.
+        - SIMPLE_PRIORITY / PRIORITY_DRIVEN : priority rank, then deadline, with emergency preemption.
+        - PEAK_SHAVING : FCFS order with power moderation above 300 kW network draw.
+        - NEAREST_STATION : arrival order, charger chosen by shortest distance to the EV.
+        - INTELLIGENT_AI_PROPOSED / SMART_AGENT : urgency ordering, composite station score
+          (distance + availability + price) and grid-safe power throttling below the
+          transformer capacity so that no critical overload is created.
+        """
         queued_evs = [ev for ev in self.evs.values() if ev.status == EVStatus.QUEUED]
         if not queued_evs:
             return
@@ -435,7 +396,9 @@ class SimulationEngine:
             EVPriority.STANDARD: 2
         }
 
-        if self.strategy_name == "PRIORITY_DRIVEN":
+        policy = self.strategy_name
+
+        if policy in ("PRIORITY_DRIVEN", "SIMPLE_PRIORITY"):
             # Sort strictly by priority, then by remaining time to departure deadline
             queued_evs.sort(key=lambda ev: (
                 priority_weights.get(ev.priority, 2),
@@ -464,54 +427,105 @@ class SimulationEngine:
                                         c.activePower = 0.0
                                         break
 
-        elif self.strategy_name == "PEAK_SHAVING":
+        elif policy == "PEAK_SHAVING":
             queued_evs.sort(key=lambda ev: (priority_weights.get(ev.priority, 2), ev.arrivalTime))
 
-        elif self.strategy_name == "SMART_AGENT":
+        elif policy in ("SMART_AGENT", "INTELLIGENT_AI_PROPOSED"):
+            # Urgency ordering: priority bonus + energy required per remaining minute
             def urgency_score(ev):
                 time_left = max(1, ev.departureDeadline - self.current_tick_min)
                 need = ev.chargingRequired
                 p_bonus = 1000 if ev.priority == EVPriority.EMERGENCY else (500 if ev.priority == EVPriority.HIGH else 0)
                 return -(p_bonus + (need / time_left * 100))
 
-            queued_evs.sort(key=urgency_score)
+            urgency = {ev.id: urgency_score(ev) for ev in queued_evs}
+            queued_evs.sort(key=lambda ev: urgency[ev.id])
 
-        else: # FCFS_BASELINE
-            queued_evs.sort(key=lambda ev: (priority_weights.get(ev.priority, 2), ev.arrivalTime))
+        elif policy == "NEAREST_STATION":
+            # Strict arrival order; the station is then chosen by shortest distance
+            queued_evs.sort(key=lambda ev: (ev.arrivalTime, ev.id))
 
-        # Assign to available chargers
+        else:
+            # FCFS_BASELINE (and any unrecognised alias): true first-come-first-served,
+            # i.e. arrival order only, with no priority weighting.
+            queued_evs.sort(key=lambda ev: (ev.arrivalTime, ev.id))
+
+        # ------------------------------------------------------------------
+        # Assignment
+        # ------------------------------------------------------------------
+        grid_safe_policy = policy in ("SMART_AGENT", "INTELLIGENT_AI_PROPOSED")
+        peak_shaving_limit_kw = 300.0
+        # The grid-safe policy prefers to keep the transformer below 85% of its rating, but
+        # will still admit a session (throttled) while the load stays below 92%. Because the
+        # simulation flags a CRITICAL_OVERLOAD at 95%, this policy cannot itself create one.
+        soft_limit_kw = self.grid_node.maximumCapacity * 0.85
+        hard_limit_kw = self.grid_node.maximumCapacity * 0.92
+        minimum_useful_power_kw = 22.0
+
         current_grid_load = sum(c.activePower for c in self.chargers.values() if c.currentStatus == ChargerStatus.OCCUPIED)
 
         for ev in queued_evs:
             assigned = False
+
+            # Build the candidate (station, charger) list, ranked according to the policy
+            candidates = []
             for station in self.stations.values():
-                if station.operatingStatus == StationOperatingStatus.OPERATIONAL:
-                    sorted_chargers = sorted(
-                        station.chargers,
-                        key=lambda c: c.maximumPower,
-                        reverse=(ev.priority in [EVPriority.EMERGENCY, EVPriority.HIGH])
-                    )
-                    for charger in sorted_chargers:
-                        if charger.currentStatus == ChargerStatus.AVAILABLE:
-                            power_wanted = min(ev.chargingRate, charger.maximumPower)
-                            
-                            # Peak shaving power moderation
-                            if self.strategy_name == "PEAK_SHAVING":
-                                if current_grid_load + power_wanted > 300.0 and ev.priority == EVPriority.STANDARD:
-                                    power_wanted = max(30.0, min(50.0, 300.0 - current_grid_load))
-                            
-                            charger.assignedEV = ev.id
-                            charger.currentStatus = ChargerStatus.OCCUPIED
-                            charger.activePower = power_wanted
-                            current_grid_load += power_wanted
-                            
-                            ev.status = EVStatus.CHARGING
-                            ev.assignedStationId = station.id
-                            ev.assignedChargerId = charger.id
-                            assigned = True
+                if station.operatingStatus != StationOperatingStatus.OPERATIONAL:
+                    continue
+                available_here = sum(1 for c in station.chargers if c.currentStatus == ChargerStatus.AVAILABLE)
+                for charger in station.chargers:
+                    if charger.currentStatus != ChargerStatus.AVAILABLE:
+                        continue
+
+                    power_cap = min(ev.chargingRate, charger.maximumPower)
+
+                    if policy == "NEAREST_STATION":
+                        rank = self._distance_to_station(ev, station)
+                    elif grid_safe_policy:
+                        # Composite score: distance + station congestion + energy price
+                        rank = (
+                            0.5 * self._distance_to_station(ev, station)
+                            + 0.3 * (1.0 / max(1, available_here))
+                            + 0.2 * station.energyPrice
+                        )
+                    else:
+                        rank = -power_cap  # prefer the most powerful free charger
+
+                    candidates.append((rank, station, charger, power_cap))
+
+            candidates.sort(key=lambda item: item[0])
+
+            for _rank, station, charger, power_cap in candidates:
+                power_wanted = power_cap
+
+                if policy == "PEAK_SHAVING":
+                    if current_grid_load + power_wanted > peak_shaving_limit_kw and ev.priority == EVPriority.STANDARD:
+                        power_wanted = max(30.0, min(50.0, peak_shaving_limit_kw - current_grid_load))
+
+                if grid_safe_policy:
+                    if current_grid_load < soft_limit_kw:
+                        # Preferred operating band: throttle only if this session would
+                        # push the transformer past the 85% soft limit.
+                        power_wanted = min(power_wanted, max(minimum_useful_power_kw, soft_limit_kw - current_grid_load))
+                    else:
+                        # Above the soft limit: admit only while the hard limit still leaves
+                        # room for a minimum useful charging rate, otherwise defer this EV.
+                        room_kw = hard_limit_kw - current_grid_load
+                        if room_kw < minimum_useful_power_kw:
                             break
-                if assigned:
-                    break
+                        power_wanted = min(power_wanted, room_kw)
+
+                charger.assignedEV = ev.id
+                charger.currentStatus = ChargerStatus.OCCUPIED
+                charger.activePower = round(power_wanted, 2)
+                current_grid_load += charger.activePower
+
+                ev.status = EVStatus.CHARGING
+                ev.assignedStationId = station.id
+                ev.assignedChargerId = charger.id
+                ev.travelDistanceKm = round(self._distance_to_station(ev, station), 2)
+                assigned = True
+                break
 
     def get_full_state(self) -> Dict:
         return {

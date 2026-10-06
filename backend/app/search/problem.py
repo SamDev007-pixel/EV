@@ -11,9 +11,29 @@ class SearchState(BaseModel):
     station_visited: Optional[str] = None
     accumulated_cost: float = 0.0
 
-    def state_key(self) -> Tuple[str, bool]:
-        """Unique state hash key for graph search closed list / visited check."""
-        return (self.node_id, self.station_visited is not None)
+    # Discretisation used by the state key. The state space must stay finite for
+    # graph search, but it must not throw away information the problem depends on.
+    BATTERY_QUANTUM_KWH: float = 1.0
+    TIME_QUANTUM_MIN: float = 5.0
+
+    def state_key(self) -> Tuple[str, str, float, int]:
+        """
+        Unique state hash key for the graph-search closed list / visited check.
+
+        The key includes a quantised battery level and time bucket. An earlier
+        version keyed states only on (node, station_visited) and therefore marked
+        a node as "explored" as soon as *any* battery level reached it. Later
+        arrivals with a usable battery were then pruned: DFS failed to find
+        solutions that provably exist, and the optimality guarantees of UCS/A*
+        no longer held. Including quantised battery (1 kWh) and elapsed time
+        (5 min buckets) keeps the abstraction sound while staying tractable.
+        """
+        return (
+            self.node_id,
+            self.station_visited or "NONE",
+            round(self.current_battery_kwh / self.BATTERY_QUANTUM_KWH) * self.BATTERY_QUANTUM_KWH,
+            int(self.current_time_min // self.TIME_QUANTUM_MIN),
+        )
 
 
 class SearchAction(BaseModel):

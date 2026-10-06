@@ -44,7 +44,9 @@ class MinimaxDecisionResult(BaseModel):
     optimal_action: GameAction
     minimax_value: float
     nodes_evaluated: int
-    alpha_beta_cutoffs: int
+    alpha_beta_cutoffs: int          # total of alpha + beta cutoffs
+    alpha_cutoffs: int = 0           # cutoffs recorded at MAX nodes
+    beta_cutoffs: int = 0            # cutoffs recorded at MIN nodes
     max_depth: int
     execution_time_ms: float
     decision_trace: List[Dict[str, Any]]
@@ -53,14 +55,6 @@ class MinimaxDecisionResult(BaseModel):
     @property
     def best_action(self) -> GameAction:
         return self.optimal_action
-
-    @property
-    def alpha_cutoffs(self) -> int:
-        return self.alpha_beta_cutoffs
-
-    @property
-    def beta_cutoffs(self) -> int:
-        return 0
 
 
 class AdversarialBargainingGame:
@@ -75,6 +69,8 @@ class AdversarialBargainingGame:
         self.max_depth = max_depth
         self.nodes_evaluated = 0
         self.alpha_beta_cutoffs = 0
+        self.alpha_cutoffs = 0
+        self.beta_cutoffs = 0
         self.trace: List[Dict[str, Any]] = []
 
     def get_actions(self, state: GameState, is_max: bool) -> List[GameAction]:
@@ -203,6 +199,7 @@ class AdversarialBargainingGame:
                 alpha = max(alpha, eval_score)
                 if beta <= alpha:
                     self.alpha_beta_cutoffs += 1
+                    self.alpha_cutoffs += 1
                     self.trace.append({
                         "depth": depth,
                         "type": "ALPHA_CUTOFF",
@@ -226,6 +223,7 @@ class AdversarialBargainingGame:
                 beta = min(beta, eval_score)
                 if beta <= alpha:
                     self.alpha_beta_cutoffs += 1
+                    self.beta_cutoffs += 1
                     self.trace.append({
                         "depth": depth,
                         "type": "BETA_CUTOFF",
@@ -239,6 +237,8 @@ class AdversarialBargainingGame:
         start_time = time.perf_counter()
         self.nodes_evaluated = 0
         self.alpha_beta_cutoffs = 0
+        self.alpha_cutoffs = 0
+        self.beta_cutoffs = 0
         self.trace = []
 
         state = initial_state or GameState()
@@ -273,6 +273,8 @@ class AdversarialBargainingGame:
             minimax_value=best_val,
             nodes_evaluated=self.nodes_evaluated,
             alpha_beta_cutoffs=self.alpha_beta_cutoffs,
+            alpha_cutoffs=self.alpha_cutoffs,
+            beta_cutoffs=self.beta_cutoffs,
             max_depth=self.max_depth,
             execution_time_ms=round(exec_time, 3),
             decision_trace=self.trace,

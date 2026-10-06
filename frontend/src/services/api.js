@@ -252,6 +252,15 @@ export async function runMinimaxCompetition(maxRounds = 2) {
 // 6. UNIT IV: KNOWLEDGE BASE & LOGICAL INFERENCE APIS
 // =============================================================================
 
+export async function fetchPEAS() {
+  try {
+    const res = await fetch(`${BASE_URL}/peas`);
+    return await handleResponse(res, 'PEAS specification unavailable.');
+  } catch (err) {
+    throw new Error(err.message || 'PEAS specification unavailable.');
+  }
+}
+
 export async function fetchFacts() {
   try {
     const res = await fetch(`${BASE_URL}/kb/facts`);

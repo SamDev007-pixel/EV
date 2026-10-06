@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PEASMatrixView from './PEASMatrixView';
 import {
   Users,
   Cpu,
@@ -212,6 +213,9 @@ export default function AgentActivityView({ agents = [], logs = [], onRefresh })
           </table>
         </div>
       </div>
+
+      {/* PEAS specification of the coordinator agent (FOAI Unit I), fetched from /api/peas */}
+      <PEASMatrixView />
 
     </div>
   );
