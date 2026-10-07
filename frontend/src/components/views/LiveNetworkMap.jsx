@@ -89,15 +89,23 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 bg-blue-700 border border-white rounded-sm" />
-          <span>Charging station</span>
+          <span className="w-2.5 h-2.5 bg-blue-600 border border-white rounded-full shadow-xs" />
+          <span>Station (Operational)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-rose-600 border border-white rounded-full shadow-xs" />
+          <span>Station (Fault)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-slate-700 rounded-full border border-white shadow-xs" />
+          <span>Fleet EV</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
           <span>Browser location</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 bg-amber-500 rounded-sm" />
+          <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
           <span>User pin</span>
         </div>
         <button
@@ -116,7 +124,7 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
       {selectedNode && (
         <div className="ai-card-flat space-y-2">
           <div className="flex items-start justify-between gap-3">
-            <span className="text-xs font-semibold text-slate-900">{selectedNode.name}</span>
+            <span className="text-xs font-semibold text-slate-900">{selectedNode.name || selectedNode.id}</span>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setSelectedNode(null)}>
               Close
             </button>
@@ -131,6 +139,30 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
                 }`,
                 mono: true,
               },
+              ...(selectedNode.charging_power !== undefined
+                ? [
+                    {
+                      term: 'Rated Power',
+                      value: `${Number(selectedNode.charging_power).toFixed(0)} kW`,
+                    },
+                  ]
+                : []),
+              ...(selectedNode.operating_status
+                ? [
+                    {
+                      term: 'Operating Status',
+                      value: selectedNode.operating_status,
+                    },
+                  ]
+                : []),
+              ...(selectedNode.soc !== undefined
+                ? [
+                    {
+                      term: 'State of Charge',
+                      value: `${Math.round(selectedNode.soc <= 1 ? selectedNode.soc * 100 : selectedNode.soc)}%`,
+                    },
+                  ]
+                : []),
               ...(selectedNode.accuracy !== undefined
                 ? [
                     {

@@ -28,41 +28,55 @@ export default {
         full: '9999px',
       },
 
-      // Neutral surface scale for the light theme, so page chrome can be written
-      // consistently instead of mixing slate/white/gray ad hoc.
+      // Official AWS Console & Website theme colors
       colors: {
+        aws: {
+          squid: '#232F3E',
+          'squid-dark': '#161E2E',
+          orange: '#EC7211',
+          'orange-hover': '#EB5F07',
+          'orange-light': '#FFF3E8',
+          blue: '#0972D3',
+          'blue-hover': '#033160',
+          'blue-light': '#F2F8FD',
+          border: '#EAEDED',
+          'border-strong': '#D5DBDB',
+          bg: '#F2F3F3',
+          text: '#16191F',
+          muted: '#545B64',
+        },
         surface: {
-          app: '#F6F8FB',
+          app: '#F2F3F3',
           card: '#FFFFFF',
-          subtle: '#F1F5F9',
-          border: '#E2E8F0',
-          'border-strong': '#CBD5E1',
+          subtle: '#F8F9FA',
+          border: '#EAEDED',
+          'border-strong': '#D5DBDB',
         },
         ink: {
-          DEFAULT: '#0F172A',
-          muted: '#475569',
-          subtle: '#64748B',
-          faint: '#94A3B8',
+          DEFAULT: '#16191F',
+          muted: '#545B64',
+          subtle: '#687078',
+          faint: '#879596',
         },
-        // Primary action colour, aligned with Tailwind's blue-600.
+        // AWS primary action blue
         primary: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
+          50: '#F2F8FD',
+          100: '#E1EFFF',
+          200: '#B9E1FB',
+          300: '#7EC2F6',
+          400: '#38A1F0',
+          500: '#0972D3',
+          600: '#0972D3',
+          700: '#0352A0',
+          800: '#033160',
+          900: '#011E3D',
         },
       },
 
       boxShadow: {
-        card: '0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.06)',
-        'card-hover': '0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04)',
-        header: '0 1px 2px 0 rgba(15, 23, 42, 0.04)',
+        card: '0 1px 1px 0 rgba(0, 28, 36, 0.1), 0 1px 2px 0 rgba(0, 28, 36, 0.05)',
+        'card-hover': '0 4px 12px -2px rgba(0, 28, 36, 0.12), 0 2px 4px -2px rgba(0, 28, 36, 0.06)',
+        header: '0 1px 2px 0 rgba(0, 28, 36, 0.08)',
       },
 
       maxWidth: {

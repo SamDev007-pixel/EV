@@ -101,11 +101,10 @@ export default function AgentNegotiationLogView() {
   return (
     <div className="page">
       
-      {/* Top Banner: Context */}
       <PageHeader
-        eyebrow="Pipeline · stage 8"
-        title="Conflict resolution and game decisions"
-        description="When two vehicles compete for the same bay or slot, the disputed resource is arbitrated either cooperatively (Nash bargaining over the utility frontier) or adversarially (Minimax with alpha-beta pruning)."
+        eyebrow="Conflict Arbitration"
+        title="Game-Theoretic Slot Conflict Arbitration"
+        description="Arbitrate concurrent vehicle competition for high-demand charging slots using cooperative Nash bargaining, Rubinstein alternating offers, and Minimax adversarial pruning."
         actions={
           <div className="tabs" role="tablist" aria-label="Decision model">
             <button

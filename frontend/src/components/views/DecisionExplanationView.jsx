@@ -6,7 +6,6 @@ import {
   Compass,
   Calendar,
   Scale,
-  Sparkles,
   Layers,
   RotateCcw,
   CheckCircle2,
@@ -83,9 +82,9 @@ export default function DecisionExplanationView({ onSelectTab }) {
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 9"
-        title="Decision explanation and rejection audit"
-        description="The full reasoning record for one request: what was asserted, which rules fired, what each search algorithm returned, how the schedule was constrained, how the conflict was arbitrated, and what was finally decided."
+        eyebrow="Decision Trace"
+        title="Decision Explanation & Trace Audit"
+        description="Comprehensive decision breakdown for vehicle requests: parameter assertions, rule evaluations, candidate search metrics, schedule constraints, and final assignment."
         actions={
           <>
             <button type="button" onClick={run} disabled={loading} className="btn-primary">
@@ -562,8 +561,7 @@ export default function DecisionExplanationView({ onSelectTab }) {
 
           {/* Stage 7 - final decision */}
           <StageCard
-            step="07"
-            icon={Sparkles}
+            icon={CheckCircle2}
             title="Final decision"
             subtitle="What the system actually recommends"
           >
@@ -766,18 +764,19 @@ export default function DecisionExplanationView({ onSelectTab }) {
   );
 }
 
-/** One numbered stage of the cascade, with a consistent header block. */
-function StageCard({ step, icon: Icon, title, subtitle, children }) {
+/** Clean section card for decision workflow stages. */
+function StageCard({ icon: Icon, title, subtitle, children }) {
   return (
-    <section className="ai-card section">
+    <section className="card section">
       <div className="section-head">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 font-mono text-2xs font-bold text-slate-500">
-            {step}
-          </span>
+          {Icon && (
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#EAEDED] bg-[#F8F9FA] text-[#0972D3]">
+              <Icon className="h-4 w-4" />
+            </span>
+          )}
           <div className="min-w-0">
             <h2 className="section-title">
-              <Icon className="h-4 w-4 shrink-0 text-slate-400" />
               <span className="truncate">{title}</span>
             </h2>
             {subtitle && <p className="section-desc">{subtitle}</p>}

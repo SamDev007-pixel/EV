@@ -205,39 +205,32 @@ export default function MapView({
       const isFault = status === 'FAULT';
       const isSelected = selectedNodeId === st.id;
       const rawName = st.name || st.id;
-      const stationName = rawName.length > 24 ? rawName.substring(0, 22) + '...' : rawName;
       const powerKw = st.charging_power ?? null;
 
-      // High-visibility SVG pin with charging symbol
-      const pinColor = isFault ? '#EF4444' : isSelected ? '#2563EB' : '#1D4ED8';
-      const borderColor = '#FFFFFF';
+      // Modern, sleek SVG pin with clean electric bolt and precise anchor
+      const pinColor = isFault ? '#D13212' : isSelected ? '#0972D3' : '#0073BB';
+      const isFastDc = powerKw && powerKw >= 60;
 
       const iconHtml = `
-        <div class="relative group cursor-pointer flex flex-col items-center">
-          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 3px rgba(15,23,42,0.25)); transform: ${isSelected ? 'scale(1.2)' : 'scale(1)'}; transition: transform 0.15s ease;">
-            <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="${pinColor}" stroke="${borderColor}" stroke-width="2"/>
-            <circle cx="14" cy="14" r="8" fill="#FFFFFF"/>
-            <path d="M14.8 8.5L10.5 14.5H14L13.2 19.5L17.5 13.5H14L14.8 8.5Z" fill="${isFault ? '#EF4444' : '#1D4ED8'}"/>
+        <div class="relative cursor-pointer flex flex-col items-center group">
+          ${isSelected ? '<div class="absolute -top-1 w-8 h-8 rounded-full bg-blue-500/25 animate-ping"></div>' : ''}
+          <svg width="24" height="30" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.28)); transform: ${isSelected ? 'scale(1.18)' : 'scale(1)'}; transition: transform 0.15s ease;">
+            <path d="M12 0C5.373 0 0 5.373 0 12C0 19.8 10.2 28.8 11.25 29.72C11.68 30.09 12.32 30.09 12.75 29.72C13.8 28.8 24 19.8 24 12C24 5.373 18.627 0 12 0Z" fill="${pinColor}" stroke="#FFFFFF" stroke-width="1.8"/>
+            <circle cx="12" cy="11.5" r="7.5" fill="#FFFFFF"/>
+            ${isFault ? `
+              <path d="M12 7.5V12M12 14.5V15" stroke="#D13212" stroke-width="2" stroke-linecap="round"/>
+            ` : `
+              <path d="M12.6 6.5L8.5 12H11.8L11.2 16.5L15.5 11H12L12.6 6.5Z" fill="${pinColor}"/>
+            `}
           </svg>
-
-          <!-- Label badge -->
-          <div class="mt-0.5 px-1.5 py-0.5 bg-white border border-slate-300 text-slate-700 text-2xs font-mono whitespace-nowrap shadow-sm">
-            ${st.id.replace('STATION-', '').replace('CS-', '')}
-          </div>
-
-          <!-- Tooltip on hover -->
-          <div class="absolute bottom-10 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col gap-0.5 px-2.5 py-1 bg-white text-slate-700 border border-slate-300 text-2xs font-mono whitespace-nowrap shadow-lg z-50 pointer-events-none">
-            <strong class="text-blue-700">${stationName}</strong>
-            <span class="text-slate-500">Power: ${powerKw} kW • Status: ${status}</span>
-          </div>
         </div>
       `;
 
       const icon = L.divIcon({
         html: iconHtml,
         className: 'custom-station-pin',
-        iconSize: [28, 42],
-        iconAnchor: [14, 34]
+        iconSize: [24, 30],
+        iconAnchor: [12, 30]
       });
 
       const marker = L.marker([lat, lng], { icon }).addTo(stationsLayerRef.current);
@@ -254,8 +247,23 @@ export default function MapView({
         }
       });
 
+      // Minimalist hover tooltip instead of cluttered permanent map badges
+      marker.bindTooltip(`
+        <div style="font-family: 'Amazon Ember', -apple-system, sans-serif; font-size: 11px; line-height: 1.35;">
+          <strong style="color: #0F172A; display: block;">${rawName}</strong>
+          <span style="color: #64748B; font-size: 10px;">
+            ${powerKw !== null ? `${Number(powerKw).toFixed(0)} kW` : 'Standard'} &middot; <span style="color: ${isFault ? '#DC2626' : '#047857'}; font-weight: 600;">${status}</span>
+          </span>
+        </div>
+      `, {
+        direction: 'top',
+        offset: [0, -32],
+        className: 'leaflet-clean-tooltip',
+        opacity: 1
+      });
+
       marker.bindPopup(`
-        <div style="font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; padding: 10px; border: 1px solid #E2E8F0; font-size: 11px; min-width: 160px; border-radius: 6px;">
+        <div style="font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; padding: 10px; border: 1px solid #E2E8F0; font-size: 11px; min-width: 170px; border-radius: 6px;">
           <strong style="color: #1D4ED8; font-size: 12px; display: block; margin-bottom: 4px;">${st.name || st.id}</strong>
           <div style="color: #334155; margin-bottom: 2px;">Rated power: <strong>${powerKw !== null ? `${Number(powerKw).toFixed(0)} kW` : 'not reported'}</strong></div>
           <div style="color: #64748B; font-size: 10px;">Status: <span style="color: ${isFault ? '#DC2626' : '#047857'}">${status}</span></div>
@@ -297,32 +305,53 @@ export default function MapView({
       const isEmergency = priority.includes('EMERGENCY') || priority.includes('CRITICAL');
       const isCharging = ev.status === 'CHARGING';
       const isSelected = selectedNodeId === ev.id;
+      const displayId = ev.id.replace('EV-', 'EV');
+      const soc = ev.soc !== undefined ? Math.round(ev.soc <= 1 ? ev.soc * 100 : ev.soc) : null;
 
-      let badgeBg = 'bg-white text-blue-700 border-slate-300';
-      let displayId = ev.id.replace('EV-', 'EV');
+      let circleBg = '#1E293B'; // Dark Slate for regular EV
+      let glyphSvg = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2 10.9 2 11.2 2 11.5V16c0 .6.4 1 1 1h2"/>
+          <circle cx="7" cy="17" r="2"/>
+          <path d="M9 17h6"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
+      `;
+      let statusLabel = ev.status || 'Active';
 
       if (isEmergency) {
-        badgeBg = 'bg-rose-100 text-rose-800 border-rose-400';
-        displayId = '108-EMG';
+        circleBg = '#D13212'; // Crimson Red
+        glyphSvg = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFFFFF">
+            <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3z"/>
+          </svg>
+        `;
+        statusLabel = 'Emergency Priority';
       } else if (isCharging) {
-        badgeBg = 'bg-blue-600 text-white border-blue-700';
-      }
-
-      if (isSelected) {
-        badgeBg += ' ring-2 ring-blue-500 scale-110';
+        circleBg = '#0972D3'; // AWS Blue
+        glyphSvg = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="#FFFFFF">
+            <path d="M13 2L4 14h7l-2 8 11-12h-7l2-8z"/>
+          </svg>
+        `;
+        statusLabel = 'Charging';
       }
 
       const evIconHtml = `
-        <div class="px-2 py-0.5 border ${badgeBg} font-mono text-2xs font-bold flex items-center justify-center shadow-sm whitespace-nowrap cursor-pointer hover:scale-110 transition-transform">
-          🚗 ${displayId}
+        <div class="relative cursor-pointer flex items-center justify-center">
+          ${isSelected ? '<div class="absolute -inset-1 rounded-full bg-blue-400/40 animate-ping"></div>' : ''}
+          ${isEmergency ? '<div class="absolute -inset-1.5 rounded-full bg-rose-500/35 animate-ping"></div>' : ''}
+          <div style="background-color: ${circleBg}; width: 24px; height: 24px; border-radius: 9999px; border: 2px solid #FFFFFF; box-shadow: 0 2px 5px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; transform: ${isSelected ? 'scale(1.2)' : 'scale(1)'}; transition: transform 0.15s ease;">
+            ${glyphSvg}
+          </div>
         </div>
       `;
 
       const evIcon = L.divIcon({
         html: evIconHtml,
         className: 'custom-ev-marker',
-        iconSize: [52, 22],
-        iconAnchor: [26, 11]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       });
 
       const evMarker = L.marker([lat, lng], { icon: evIcon }).addTo(evsLayerRef.current);
@@ -338,6 +367,20 @@ export default function MapView({
           });
         }
       });
+
+      evMarker.bindTooltip(`
+        <div style="font-family: 'Amazon Ember', -apple-system, sans-serif; font-size: 11px; line-height: 1.35;">
+          <strong style="color: #0F172A; display: block;">${displayId} ${isEmergency ? '<span style="color: #DC2626; font-size: 9px; font-weight: 700;">[EMERGENCY]</span>' : ''}</strong>
+          <span style="color: #64748B; font-size: 10px;">
+            ${statusLabel}${soc !== null ? ` &middot; SoC ${soc}%` : ''}
+          </span>
+        </div>
+      `, {
+        direction: 'top',
+        offset: [0, -12],
+        className: 'leaflet-clean-tooltip',
+        opacity: 1
+      });
     });
   }, [evs, selectedNodeId, mapReady]);
 
@@ -348,22 +391,20 @@ export default function MapView({
 
     customMarkers.forEach((pin) => {
       const pinIconHtml = `
-        <div class="relative cursor-pointer group flex flex-col items-center">
-          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 3px rgba(15,23,42,0.25));">
-            <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
-            <circle cx="14" cy="14" r="6" fill="#FFFFFF"/>
+        <div class="relative cursor-pointer flex flex-col items-center">
+          <svg width="24" height="30" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.28));">
+            <path d="M12 0C5.373 0 0 5.373 0 12C0 19.8 10.2 28.8 11.25 29.72C11.68 30.09 12.32 30.09 12.75 29.72C13.8 28.8 24 19.8 24 12C24 5.373 18.627 0 12 0Z" fill="#D97706" stroke="#FFFFFF" stroke-width="1.8"/>
+            <circle cx="12" cy="11.5" r="7.5" fill="#FFFFFF"/>
+            <circle cx="12" cy="11.5" r="3.5" fill="#D97706"/>
           </svg>
-          <div class="mt-0.5 px-1.5 py-0.5 bg-white border border-amber-400 text-amber-700 font-mono text-2xs whitespace-nowrap">
-            ${pin.name || 'Pinned Point'}
-          </div>
         </div>
       `;
 
       const pinIcon = L.divIcon({
         html: pinIconHtml,
         className: 'custom-user-pin',
-        iconSize: [28, 42],
-        iconAnchor: [14, 34]
+        iconSize: [24, 30],
+        iconAnchor: [12, 30]
       });
 
       const marker = L.marker([pin.lat, pin.lng], { icon: pinIcon }).addTo(customMarkersLayerRef.current);
@@ -377,6 +418,17 @@ export default function MapView({
             longitude: pin.lng
           });
         }
+      });
+
+      marker.bindTooltip(`
+        <div style="font-family: 'Amazon Ember', -apple-system, sans-serif; font-size: 11px;">
+          <strong style="color: #92400E;">${pin.name || 'Pinned Point'}</strong>
+        </div>
+      `, {
+        direction: 'top',
+        offset: [0, -32],
+        className: 'leaflet-clean-tooltip',
+        opacity: 1
       });
     });
   }, [customMarkers, mapReady]);
@@ -429,22 +481,19 @@ export default function MapView({
 
       const searchIconHtml = `
         <div class="relative flex flex-col items-center">
-          <svg width="32" height="38" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(37,99,235,0.35));">
-            <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>
-            <circle cx="14" cy="14" r="7" fill="#FFFFFF"/>
-            <text x="14" y="18" font-size="10" text-anchor="middle" fill="#1D4ED8" font-weight="bold">📍</text>
+          <svg width="24" height="30" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.28));">
+            <path d="M12 0C5.373 0 0 5.373 0 12C0 19.8 10.2 28.8 11.25 29.72C11.68 30.09 12.32 30.09 12.75 29.72C13.8 28.8 24 19.8 24 12C24 5.373 18.627 0 12 0Z" fill="#0972D3" stroke="#FFFFFF" stroke-width="1.8"/>
+            <circle cx="12" cy="11.5" r="7.5" fill="#FFFFFF"/>
+            <circle cx="12" cy="11.5" r="3.5" fill="#0972D3"/>
           </svg>
-          <div class="mt-0.5 px-2 py-0.5 bg-white border border-blue-400 text-blue-700 font-mono text-2xs whitespace-nowrap shadow-sm">
-            ${name || 'Searched Location'}
-          </div>
         </div>
       `;
 
       const searchIcon = L.divIcon({
         html: searchIconHtml,
         className: 'custom-search-marker',
-        iconSize: [32, 46],
-        iconAnchor: [16, 38]
+        iconSize: [24, 30],
+        iconAnchor: [12, 30]
       });
 
       const marker = L.marker([lat, lng], { icon: searchIcon }).addTo(searchedLocLayerRef.current);
@@ -514,6 +563,18 @@ export default function MapView({
             id: poi.id || `POI-${category}`
           });
         }
+      });
+
+      marker.bindTooltip(`
+        <div style="font-family: 'Amazon Ember', -apple-system, sans-serif; font-size: 11px;">
+          <strong style="color: #0F172A;">${poi.name}</strong>
+          <span style="color: #64748B; font-size: 10px; display: block;">${category}</span>
+        </div>
+      `, {
+        direction: 'top',
+        offset: [0, -12],
+        className: 'leaflet-clean-tooltip',
+        opacity: 1
       });
     });
   }, [pois, mapReady]);

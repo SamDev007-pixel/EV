@@ -12,23 +12,26 @@
    ========================================================================== */
 
 :root {
-  --bg-app: #F6F8FB;
+  --bg-app: #F2F3F3;
   --bg-card: #FFFFFF;
-  --bg-subtle: #F1F5F9;
-  --border-card: #E2E8F0;
-  --border-strong: #CBD5E1;
-  --text-main: #0F172A;
-  --text-muted: #475569;
-  --text-subtle: #64748B;
-  --text-faint: #94A3B8;
-  --primary: #2563EB;
-  --primary-hover: #1D4ED8;
-  --primary-soft: #EFF6FF;
-  --accent-teal: #0D9488;
-  --accent-sky: #0284C7;
-  --accent-emerald: #059669;
-  --accent-amber: #D97706;
-  --accent-crimson: #DC2626;
+  --bg-subtle: #F8F9FA;
+  --border-card: #EAEDED;
+  --border-strong: #D5DBDB;
+  --text-main: #16191F;
+  --text-muted: #545B64;
+  --text-subtle: #687078;
+  --text-faint: #879596;
+  --primary: #0972D3;
+  --primary-hover: #033160;
+  --primary-soft: #F2F8FD;
+  --accent-orange: #EC7211;
+  --accent-orange-hover: #EB5F07;
+  --accent-orange-soft: #FFF3E8;
+  --accent-teal: #0073BB;
+  --accent-sky: #0972D3;
+  --accent-emerald: #037F0C;
+  --accent-amber: #875900;
+  --accent-crimson: #D13212;
 
   /* One spacing rhythm used by every page. */
   --gap-page: 1.5rem;
@@ -48,19 +51,30 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-html, body, #root {
-  background-color: var(--bg-app);
-  color: var(--text-main);
+html, body {
   min-height: 100vh;
   font-family: var(--font-family-base);
+  color: var(--text-main);
 }
 
 body {
+  margin: 0;
   font-family: var(--font-family-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 0.875rem;
   line-height: 1.55;
+  background-color: #F8F9FA;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)), url('/ev-bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+#root {
+  min-height: 100vh;
+  background: transparent;
 }
 
 /* Universal font enforcement: ensures no element escapes Amazon Ember */
@@ -164,23 +178,45 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
    2. CARDS & SECTIONS
    -------------------------------------------------------------------------- */
 
+.card,
 .ai-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.06);
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.1), 0 1px 2px 0 rgba(0, 28, 36, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.card:hover,
+.ai-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 3px 8px -1px rgba(0, 28, 36, 0.12), 0 1px 3px -1px rgba(0, 28, 36, 0.06);
+}
+
+.card-flat,
 .ai-card-flat {
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease;
 }
 
+.card-flat:hover,
+.ai-card-flat:hover {
+  border-color: var(--border-strong);
+}
+
+.card-subtle,
 .ai-card-subtle {
   background-color: var(--bg-subtle);
   border: 1px solid var(--border-card);
   border-radius: 0.375rem;
+  transition: border-color 0.15s ease;
+}
+
+.card-subtle:hover,
+.ai-card-subtle:hover {
+  border-color: var(--border-strong);
 }
 
 .section {
@@ -241,10 +277,6 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-@media (min-width: 640px) {
-  .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
 @media (min-width: 1024px) {
   .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
@@ -258,7 +290,15 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   padding: 0.875rem 1rem;
   background-color: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.08);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.stat:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px -2px rgba(0, 28, 36, 0.12);
+  transform: translateY(-1px);
 }
 
 .stat-label {
@@ -296,13 +336,16 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
    4. TABLES
    -------------------------------------------------------------------------- */
 
+.table-container,
 .ai-table-container {
   overflow-x: auto;
   border: 1px solid var(--border-card);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   background-color: var(--bg-card);
+  box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.05);
 }
 
+.table-clean,
 .ai-table {
   width: 100%;
   border-collapse: collapse;
@@ -313,7 +356,7 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
 .ai-table thead th {
   position: sticky;
   top: 0;
-  background-color: var(--bg-subtle);
+  background-color: #F8F9FA;
   color: var(--text-muted);
   font-weight: 700;
   font-size: 0.6875rem;
@@ -327,9 +370,10 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
 
 .ai-table tbody td {
   padding: 0.6875rem 0.875rem;
-  border-bottom: 1px solid #EEF2F7;
-  color: #1E293B;
+  border-bottom: 1px solid var(--border-card);
+  color: var(--text-main);
   vertical-align: middle;
+  transition: background-color 0.1s ease;
 }
 
 .ai-table tbody tr:last-child td {
@@ -337,7 +381,7 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
 }
 
 .ai-table tbody tr:hover td {
-  background-color: #FAFCFE;
+  background-color: #F8F9FA;
 }
 
 /* Numeric columns: right aligned with tabular figures so digits form columns. */
@@ -370,11 +414,11 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
 }
 
 /* --------------------------------------------------------------------------
-   5. BADGES & PILLS
+   5. BADGES & PILLS (AWS Status Theme)
    -------------------------------------------------------------------------- */
 
 .badge-blue, .badge-teal, .badge-emerald, .badge-amber, .badge-rose,
-.badge-slate, .badge-violet {
+.badge-slate, .badge-violet, .badge-orange {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -384,18 +428,20 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   padding: 0.3125rem 0.5rem;
   border-radius: 0.25rem;
   white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.badge-blue   { background-color: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
-.badge-teal   { background-color: #F0FDFA; color: #0F766E; border: 1px solid #99F6E4; }
-.badge-emerald{ background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
-.badge-amber  { background-color: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
-.badge-rose   { background-color: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
-.badge-slate  { background-color: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
-.badge-violet { background-color: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+.badge-blue   { background-color: #F2F8FD; color: #0972D3; border: 1px solid #B9E1FB; }
+.badge-teal   { background-color: #E6F7FF; color: #0073BB; border: 1px solid #BAE7FF; }
+.badge-emerald{ background-color: #EDF7ED; color: #037F0C; border: 1px solid #C8E6C9; }
+.badge-amber  { background-color: #FFF8E1; color: #875900; border: 1px solid #FFE082; }
+.badge-rose   { background-color: #FDF3F2; color: #D13212; border: 1px solid #FFCDD2; }
+.badge-slate  { background-color: #F2F3F3; color: #545B64; border: 1px solid #EAEDED; }
+.badge-violet { background-color: #F3E8FF; color: #7E22CE; border: 1px solid #E9D5FF; }
+.badge-orange { background-color: #FFF3E8; color: #EC7211; border: 1px solid #FBD0A8; }
 
 /* --------------------------------------------------------------------------
-   6. BUTTONS
+   6. BUTTONS (AWS Interactive Buttons)
    -------------------------------------------------------------------------- */
 
 .btn-primary, .btn-secondary, .btn-ghost {
@@ -408,9 +454,9 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   font-size: 0.8125rem;
   font-weight: 600;
   line-height: 1;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
   white-space: nowrap;
 }
 
@@ -418,29 +464,48 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   background-color: var(--primary);
   color: #FFFFFF;
   border: 1px solid var(--primary-hover);
+  box-shadow: 0 1px 2px rgba(0, 28, 36, 0.15);
 }
-.btn-primary:hover { background-color: var(--primary-hover); }
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+  border-color: #011E3D;
+  box-shadow: 0 2px 5px rgba(0, 28, 36, 0.25);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
 
 .btn-secondary {
   background-color: #FFFFFF;
-  color: #334155;
-  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  border: 1px solid #879596;
+  box-shadow: 0 1px 1px rgba(0, 28, 36, 0.05);
 }
-.btn-secondary:hover { background-color: var(--bg-subtle); border-color: #94A3B8; color: var(--text-main); }
+.btn-secondary:hover {
+  background-color: #F2F3F3;
+  border-color: #16191F;
+  color: #16191F;
+}
+.btn-secondary:active {
+  transform: translateY(1px);
+}
 
 .btn-ghost {
   background-color: transparent;
-  color: var(--text-subtle);
+  color: var(--text-muted);
   border: 1px solid transparent;
 }
-.btn-ghost:hover { background-color: var(--bg-subtle); color: var(--text-main); }
+.btn-ghost:hover {
+  background-color: #EAEDED;
+  color: #16191F;
+}
 
 /* Compact variant, for toolbars and table row actions. */
 .btn-sm {
   min-height: 1.875rem;
   padding: 0 0.625rem;
   font-size: 0.75rem;
-  border-radius: 0.3125rem;
+  border-radius: 0.25rem;
 }
 
 .btn-primary:disabled, .btn-secondary:disabled, .btn-ghost:disabled {
@@ -455,7 +520,7 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
 }
 
 /* --------------------------------------------------------------------------
-   7. FORM CONTROLS
+   7. FORM CONTROLS (AWS Cloudscape Inputs)
    -------------------------------------------------------------------------- */
 
 .form-input {
@@ -463,8 +528,8 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   width: 100%;
   min-height: 2.25rem;
   background-color: #FFFFFF;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.375rem;
+  border: 1px solid #879596;
+  border-radius: 0.25rem;
   padding: 0.4375rem 0.6875rem;
   font-size: 0.8125rem;
   font-family: inherit;
@@ -472,10 +537,14 @@ code, pre, kbd, samp, .font-mono, .font-mono * {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.form-input:hover {
+  border-color: #545B64;
+}
+
 .form-input:focus {
   outline: none;
-  border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  border-color: #0972D3;
+  box-shadow: 0 0 0 2px rgba(9, 114, 211, 0.25);
 }
 
 .form-input:disabled {
@@ -494,6 +563,15 @@ select.form-input {
   background-position: right 0.6rem center;
   background-size: 0.9rem;
 }
+
+/* Ensure padding utilities take priority on inputs with icons */
+.form-input.pl-8, input.form-input.pl-8, input.form-input.\!pl-8 { padding-left: 2rem !important; }
+.form-input.pl-9, input.form-input.pl-9, input.form-input.\!pl-9 { padding-left: 2.25rem !important; }
+.form-input.pl-10, input.form-input.pl-10, input.form-input.\!pl-10 { padding-left: 2.5rem !important; }
+
+/* Ensure width utility classes take priority on form inputs */
+.form-input.w-auto, select.form-input.w-auto, select.form-input.\!w-auto { width: auto !important; }
+.form-input.w-24, input.form-input.w-24 { width: 6rem !important; }
 
 .form-label {
   display: block;
@@ -527,7 +605,7 @@ select.form-input {
 }
 
 /* --------------------------------------------------------------------------
-   8. TOOLBAR & TABS
+   8. TOOLBAR & TABS (AWS Console Tabs)
    -------------------------------------------------------------------------- */
 
 .toolbar {
@@ -549,9 +627,9 @@ select.form-input {
   flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.25rem;
-  background-color: var(--bg-subtle);
+  background-color: #F2F3F3;
   border: 1px solid var(--border-card);
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
 }
 
 .tab {
@@ -561,21 +639,24 @@ select.form-input {
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-subtle);
+  color: var(--text-muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 0.3125rem;
+  border-radius: 0.25rem;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.tab:hover { color: var(--text-main); background-color: rgba(255, 255, 255, 0.7); }
+.tab:hover {
+  color: var(--text-main);
+  background-color: #EAEDED;
+}
 
 .tab[aria-selected='true'] {
   background-color: #FFFFFF;
-  color: var(--primary-hover);
-  border-color: var(--border-card);
-  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  color: #0972D3;
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 2px 0 rgba(0, 28, 36, 0.08);
 }
 
 /* --------------------------------------------------------------------------
@@ -603,15 +684,15 @@ select.form-input {
   align-items: flex-start;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
+  border-radius: 0.25rem;
   font-size: 0.8125rem;
   border: 1px solid;
 }
 
-.banner--error { background-color: #FFF1F2; border-color: #FECDD3; color: #9F1239; }
-.banner--warn  { background-color: #FFFBEB; border-color: #FDE68A; color: #92400E; }
-.banner--info  { background-color: #EFF6FF; border-color: #BFDBFE; color: #1E40AF; }
-.banner--ok    { background-color: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+.banner--error { background-color: #FDF3F2; border-color: #FFCDD2; color: #D13212; }
+.banner--warn  { background-color: #FFF8E1; border-color: #FFE082; color: #875900; }
+.banner--info  { background-color: #F2F8FD; border-color: #B9E1FB; color: #0972D3; }
+.banner--ok    { background-color: #EDF7ED; border-color: #C8E6C9; color: #037F0C; }
 
 /* --------------------------------------------------------------------------
    10. KEY/VALUE LISTS & PROGRESS
@@ -683,6 +764,34 @@ select.form-input {
 
 .leaflet-popup-content { margin: 0; font-size: 0.8125rem; }
 .leaflet-popup-tip { background: #FFFFFF; }
+
+/* Minimalist, clean Leaflet tooltips with Amazon Ember typography */
+.leaflet-clean-tooltip {
+  background: #FFFFFF !important;
+  color: #0F172A !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1), 0 2px 4px -2px rgba(15, 23, 42, 0.06) !important;
+  padding: 5px 9px !important;
+  font-family: var(--font-family-base) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+.leaflet-clean-tooltip::before {
+  border-top-color: #CBD5E1 !important;
+}
+
+/* Ensure custom divIcons don't have default Leaflet white square borders */
+.custom-station-pin,
+.custom-ev-marker,
+.custom-user-pin,
+.custom-search-marker,
+.custom-poi-marker,
+.custom-gps-marker {
+  background: transparent !important;
+  border: none !important;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

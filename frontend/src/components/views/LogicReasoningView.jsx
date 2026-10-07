@@ -126,12 +126,11 @@ export default function LogicReasoningView({ evs = [], stations = [] }) {
   return (
     <div className="page">
       
-      {/* Top Banner: Context */}
       <PageHeader
-        eyebrow="Pipeline · stage 6"
-        title="Knowledge base and logical inference"
-        description="A fact base and a set of production rules are queried by forward chaining, backward chaining and resolution refutation. The traces below show each inference step the engine performed."
-        actions={<span className="badge-slate">Traces produced by the running engine</span>}
+        eyebrow="Knowledge & Logic Rules"
+        title="Knowledge Base & Logical Inference"
+        description="Verify charging eligibility, safety constraints, and priority rules using forward chaining, backward goal verification, and resolution refutation."
+        actions={<span className="badge-slate">Active Rule Verification Engine</span>}
       />
 
       {/* Tabs: forward chaining | backward chaining | resolution | fact and rule browser */}

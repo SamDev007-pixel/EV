@@ -5,7 +5,7 @@ import React from 'react';
  * Used for every content block so section spacing and heading placement match
  * across the application.
  */
-export default function Section({ title, description, icon: Icon, actions, children, className = '', bodyClassName = '' }) {
+export default function Section({ title, description, icon: Icon, actions, children, className = '', bodyClassName = 'space-y-4' }) {
   const hasHead = Boolean(title || actions);
 
   return (

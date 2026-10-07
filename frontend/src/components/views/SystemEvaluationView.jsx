@@ -82,9 +82,9 @@ export default function SystemEvaluationView() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Evaluation"
-        title="Scheduling policy comparison"
-        description="Four scheduling policies run one after another inside an identical seeded simulation. Everything in the table is measured from those runs, not estimated. The AI decision pipeline itself is demonstrated on its own screens (search, CSP, logic, conflict resolution)."
+        eyebrow="System Evaluation"
+        title="Scheduling Policy Performance Evaluation"
+        description="Comparative evaluation of scheduling policies under identical fleet demand, measuring waiting times, grid overload occurrences, and energy efficiency."
         actions={
           <div className="toolbar">
             <label className="flex items-center gap-2 text-xs text-slate-500">

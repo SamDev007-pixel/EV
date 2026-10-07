@@ -102,9 +102,9 @@ export default function AgentActivityView({ agents = [], logs = [], onRefresh })
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 7"
-        title="Agent system and decision log"
-        description="Every agent is a separate reasoning unit with its own goals and percepts. The log below records the perceive → decide → act cycle and the messages agents exchanged, exactly as the running simulation produced them."
+        eyebrow="Multi-Agent System"
+        title="Agent Coordination & Activity Log"
+        description="Real-time activity and message communication across vehicle agents, station agents, grid transformers, and fleet coordinators."
         actions={
           <button type="button" onClick={onRefresh} className="btn-secondary">
             <RefreshCw className="h-4 w-4" />
@@ -153,16 +153,19 @@ export default function AgentActivityView({ agents = [], logs = [], onRefresh })
                 placeholder="Filter by agent, step or action…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-input pl-8"
+                className="form-input !pl-8"
                 aria-label="Filter log entries"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="inline-flex items-center gap-1 text-xs text-slate-500 whitespace-nowrap shrink-0">
+                <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                Role
+              </span>
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="form-input w-auto"
+                className="form-input !w-auto shrink-0"
                 aria-label="Filter by agent role"
               >
                 <option value="ALL">All roles</option>

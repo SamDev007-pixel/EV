@@ -119,44 +119,58 @@ export default function App() {
 
   if (loading && !simState) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-surface-app p-6 text-center">
-        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-blue-600 border-t-transparent" />
-        <h2 className="mt-4 text-base font-bold text-slate-900">
-          Intelligent EV Charging &amp; Resource Management System
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Loading the decision engines and the knowledge base&hellip;
-        </p>
+      <div className="relative flex min-h-screen flex-col items-center justify-center p-6 text-center font-sans">
+        <div
+          className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)), url('/ev-bg.png')" }}
+          aria-hidden="true"
+        />
+        <div className="relative z-10 flex flex-col items-center">
+          <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-blue-600 border-t-transparent" />
+          <h2 className="mt-4 text-base font-bold text-slate-900">
+            Intelligent EV Charging &amp; Resource Management System
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Loading charging network and simulation state&hellip;
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface-app font-sans text-slate-900">
-
-      <Sidebar
-        activeTab={activeTab}
-        onSelectTab={handleSelectTab}
-        isOpen={isSidebarOpen}
-        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        onClose={() => setIsSidebarOpen(false)}
+    <div className="relative flex min-h-screen flex-col font-sans text-slate-900">
+      {/* Background Image with White Screen Overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)), url('/ev-bg.png')" }}
+        aria-hidden="true"
       />
 
-      {/* Content column, offset by the sidebar width */}
-      <div
-        className={`flex flex-1 flex-col transition-[padding] duration-200 ease-in-out ${
-          isSidebarOpen ? 'lg:pl-64 xl:pl-72' : 'lg:pl-16'
-        }`}
-      >
-
-        <Header
-          currentTick={simState?.current_tick_min ?? 0}
-          strategyName={simState?.strategy_name}
-          onToggleSidebar={() => setIsSidebarOpen(true)}
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={handleSelectTab}
+          isOpen={isSidebarOpen}
+          onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
-        {error && (
-          <div className="border-b border-rose-200 bg-rose-50">
+        {/* Content column, offset by the sidebar width */}
+        <div
+          className={`flex flex-1 flex-col transition-[padding] duration-200 ease-in-out ${
+            isSidebarOpen ? 'lg:pl-60' : 'lg:pl-14'
+          }`}
+        >
+
+          <Header
+            currentTick={simState?.current_tick_min ?? 0}
+            strategyName={simState?.strategy_name}
+            onToggleSidebar={() => setIsSidebarOpen(true)}
+          />
+
+          {error && (
+            <div className="border-b border-rose-200 bg-rose-50/95">
             <div className="mx-auto max-w-content px-4 py-2.5 text-xs font-medium text-rose-800 sm:px-6 lg:px-8">
               {error}
             </div>
@@ -224,13 +238,14 @@ export default function App() {
             <span>
               Intelligent EV Charging &amp; Resource Management System
             </span>
-            <span className="font-mono text-slate-400">
-              Deterministic classical AI &bull; no machine learning
+            <span className="text-slate-400">
+              v1.0.0 &bull; Intelligent EV Resource Management
             </span>
           </div>
         </footer>
 
       </div>
     </div>
+  </div>
   );
 }

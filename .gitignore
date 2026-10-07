@@ -19,7 +19,11 @@ dist/
 build/
 .DS_Store
 
-# Archives
+# Archives & Patches
 # Source lives in backend/ and frontend/; redundant snapshot archives must not
 # be committed (they also smuggle git-ignored files such as .env past this file).
 *.zip
+*.patch
+
+# Temporary Office lock files
+~$*

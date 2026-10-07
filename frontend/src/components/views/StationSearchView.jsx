@@ -40,9 +40,9 @@ export default function StationSearchView({ stations = [], evs = [], onSelectTab
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 3"
-        title="Charging station network"
-        description="The candidate set that the search algorithms explore: station locations, supported charger types, live bay availability, published tariff and queue state."
+        eyebrow="Station Discovery"
+        title="Charging Station Network"
+        description="Explore available charging stations across the network: locations, connector types, real-time availability, power ratings, and pricing."
         actions={
           <button
             type="button"
@@ -75,7 +75,7 @@ export default function StationSearchView({ stations = [], evs = [], onSelectTab
         title="Filter stations"
         description="Filtering happens on the loaded snapshot and does not call the backend again."
       >
-        <div className="toolbar">
+        <div className="toolbar items-center">
           <div className="relative w-full sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -83,20 +83,20 @@ export default function StationSearchView({ stations = [], evs = [], onSelectTab
               placeholder="Search by name, code, operator or address…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="form-input pl-9"
+              className="form-input !pl-9"
               aria-label="Search stations"
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Filter className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 whitespace-nowrap shrink-0">
+              <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               Charger type
             </span>
             <select
               value={selectedConnector}
               onChange={(e) => setSelectedConnector(e.target.value)}
-              className="form-input w-auto"
+              className="form-input !w-auto shrink-0"
               aria-label="Filter by charger type"
             >
               <option value="ALL">All types</option>

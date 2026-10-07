@@ -87,9 +87,9 @@ export default function SearchComparisonView({ evs = [] }) {
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 4"
-        title="Search algorithm comparison"
-        description="Breadth-first, depth-first, uniform cost, greedy best-first and A* search are executed on the same network snapshot. Every figure below is measured by the backend for this run."
+        eyebrow="Algorithm Benchmarks"
+        title="Search Algorithm Performance Comparison"
+        description="Compare BFS, DFS, Uniform Cost Search, Greedy Best-First, and A* search on the charging station network across path cost, nodes expanded, and execution time."
         actions={
           <>
             <button type="button" onClick={loadPresetEV07} className="btn-secondary">
@@ -287,14 +287,14 @@ export default function SearchComparisonView({ evs = [] }) {
             <table className="ai-table">
               <thead>
                 <tr>
-                  <th>Algorithm</th>
-                  <th>Class</th>
+                  <th className="whitespace-nowrap">Algorithm</th>
+                  <th className="whitespace-nowrap">Class</th>
                   <th className="num">Path cost</th>
                   <th className="num">Nodes expanded</th>
                   <th className="num">Runtime</th>
                   <th className="num">Duration</th>
                   <th className="num">Charging cost</th>
-                  <th>Station reached</th>
+                  <th className="whitespace-nowrap">Station reached</th>
                   <th>Route</th>
                 </tr>
               </thead>
@@ -304,13 +304,13 @@ export default function SearchComparisonView({ evs = [] }) {
                   const informed = ['A*', 'Greedy'].some((k) => String(res.algorithm).includes(k));
                   return (
                     <tr key={res.algorithm} className={isChosen ? 'row-selected' : ''}>
-                      <td className="font-semibold text-slate-900">
-                        <span className="flex items-center gap-2">
-                          {res.algorithm}
-                          {isChosen && <span className="badge-blue">Selected</span>}
+                      <td className="font-semibold text-slate-900 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span>{res.algorithm}</span>
+                          {isChosen && <span className="badge-blue shrink-0">Selected</span>}
                         </span>
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         <span className={informed ? 'badge-teal' : 'badge-slate'}>
                           {informed ? 'Informed' : 'Uninformed'}
                         </span>
@@ -324,11 +324,11 @@ export default function SearchComparisonView({ evs = [] }) {
                           ? 'n/a'
                           : `$${numberOf(res.total_charging_cost_usd, 2)}`}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {res.success ? (
-                          <span className="badge-emerald">{res.selected_station || 'reached'}</span>
+                          <span className="badge-emerald shrink-0">{res.selected_station || 'reached'}</span>
                         ) : (
-                          <span className="badge-rose">No goal found</span>
+                          <span className="badge-rose shrink-0">No goal found</span>
                         )}
                       </td>
                       <td

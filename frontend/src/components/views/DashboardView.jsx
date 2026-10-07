@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Play,
   RotateCcw,
-  Sparkles,
   GitCompare,
   Battery,
   Grid3x3
@@ -120,9 +119,9 @@ export default function DashboardView({
     <div className="page">
 
       <PageHeader
-        eyebrow="Executive overview"
-        title="Autonomous EV charging decision support"
-        description="Live view of the fleet, the charging network and the classical AI decision pipeline: heuristic search, constraint satisfaction, logical inference and game-theoretic conflict resolution. No machine learning is used anywhere in this system."
+        eyebrow="Overview"
+        title="EV Charging & Resource Management Dashboard"
+        description="Real-time monitoring of fleet status, charging station availability, grid transformer load, and scheduled sessions."
         actions={
           <>
             <button
@@ -130,7 +129,7 @@ export default function DashboardView({
               onClick={() => onSelectTab('ev_request')}
               className="btn-primary"
             >
-              <Sparkles className="h-4 w-4" />
+              <Car className="h-4 w-4" />
               Submit EV request
             </button>
             <button
@@ -436,8 +435,8 @@ export default function DashboardView({
         </Section>
 
         <Section
-          title="Where to continue"
-          description="The workflow runs left to right; each page shows one stage of the reasoning."
+          title="Operational Workspaces"
+          description="Direct access to search, scheduling, rule verification, and conflict arbitration modules."
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[

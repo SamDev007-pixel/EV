@@ -243,9 +243,9 @@ export default function EVRequestView({ onSelectTab, onWorkflowExecuted }) {
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 1–2"
-        title="EV charging request and problem formulation"
-        description="Enter the vehicle's parameters. The request is translated into a formal search problem — initial state, goal test, action space, step cost, heuristic and hard constraints — before any algorithm runs."
+        eyebrow="Request Management"
+        title="EV Charging Request & Problem Formulation"
+        description="Enter vehicle specifications and charging requirements to configure route planning and scheduling parameters."
         meta={
           activePreset && (
             <span className="badge-slate normal-case">Sample request: {PRESETS[activePreset].name}</span>

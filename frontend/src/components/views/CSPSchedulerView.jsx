@@ -84,9 +84,9 @@ export default function CSPSchedulerView() {
     <div className="page">
 
       <PageHeader
-        eyebrow="Pipeline · stage 5"
-        title="Charging schedule as a constraint satisfaction problem"
-        description="Vehicles are assigned to a charger and a 15-minute time slot while the solver enforces bay non-overlap, station power capacity, connector compatibility and departure deadlines."
+        eyebrow="Slot Scheduling"
+        title="Constraint Satisfaction Scheduling"
+        description="Assign vehicles to charging bays and 15-minute time slots while enforcing bay non-overlap, power capacity, connector compatibility, and departure deadlines."
         actions={
           <>
             <button type="button" onClick={runSolver} disabled={loading} className="btn-primary">
