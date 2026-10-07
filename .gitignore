@@ -19,5 +19,7 @@ dist/
 build/
 .DS_Store
 
-# Build artifacts / release archives (regenerate locally, never commit)
+# Archives
+# Source lives in backend/ and frontend/; redundant snapshot archives must not
+# be committed (they also smuggle git-ignored files such as .env past this file).
 *.zip
