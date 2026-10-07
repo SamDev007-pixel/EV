@@ -1,312 +1,214 @@
-import React, { useState, useEffect } from 'react';
-import {
-  MapView,
-  MapSearch,
-  CurrentLocation,
-  RouteControl,
-  PlaceDetails,
-  POIFilterControl
-} from '../map';
-import { Navigation, MapPin, Zap, Layers, Info, CheckCircle2, Shield } from 'lucide-react';
-import { getNearbyPOIs } from '../../services/osmApi';
+import React, { useState } from 'react';
+import { MapView, CurrentLocation } from '../map';
+import { Navigation, Zap, CheckCircle2, Shield, Info } from 'lucide-react';
+import { KeyValueGrid, StatTile } from '../common';
 
+/**
+ * Station network map.
+ *
+ * Data sources:
+ *  - station records come from the backend environment snapshot (/api/state -> data_sources
+ *    "station_metadata": a static public dataset snapshot shipped with the repository);
+ *  - EV positions and station status come from the deterministic simulation;
+ *  - pins dropped by the user are user input, held in component state only.
+ *
+ * The map canvas renders with Leaflet; no external geocoding, routing or POI service is
+ * queried, so the screen works fully offline.
+ */
 export default function LiveNetworkMap({ stations = [], evs = [] }) {
-  // Application stations (guaranteeing fallback to real Bengaluru corridors if stations prop is empty)
-  const activeStations = stations.length > 0 ? stations : [
-    {
-      id: 'CS-METRO',
-      name: 'Tata Power - MG Road Central Metro EV Hub',
-      latitude: 12.9756,
-      longitude: 77.6066,
-      charging_power_kw: 120.0,
-      total_ports: 4,
-      price_per_kwh: 18.5,
-      status: 'OPERATIONAL'
-    },
-    {
-      id: 'CS-NORTH',
-      name: 'Kazam EV - Hebbal Tech Park Supercharger',
-      latitude: 13.0358,
-      longitude: 77.5970,
-      charging_power_kw: 60.0,
-      total_ports: 4,
-      price_per_kwh: 16.0,
-      status: 'OPERATIONAL'
-    },
-    {
-      id: 'CS-SOUTH',
-      name: 'Zeon EV - Electronic City Fast Hub',
-      latitude: 12.8452,
-      longitude: 77.6602,
-      charging_power_kw: 150.0,
-      total_ports: 4,
-      price_per_kwh: 17.5,
-      status: 'OPERATIONAL'
-    },
-    {
-      id: 'STATION-CHARGEZONE-WHITEFIELD',
-      name: 'ChargeZone EV Supercharger - Whitefield',
-      latitude: 12.9863,
-      longitude: 77.7344,
-      charging_power_kw: 60.0,
-      total_ports: 4,
-      price_per_kwh: 16.5,
-      status: 'OPERATIONAL'
-    }
-  ];
-
-  // User interactive state
   const [customMarkers, setCustomMarkers] = useState([]);
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [searchedLocation, setSearchedLocation] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [activeRoute, setActiveRoute] = useState(null);
 
-  // Origin & Destination for OSRM Route Control
-  const [routeOrigin, setRouteOrigin] = useState(null);
-  const [routeDestination, setRouteDestination] = useState(null);
+  const operationalCount = stations.filter((s) => s.operating_status === 'OPERATIONAL').length;
+  const totalChargers = stations.reduce((acc, s) => acc + (s.chargers?.length || 0), 0);
 
-  // Overpass POI Layer State
-  const [showPOIs, setShowPOIs] = useState(false);
-  const [poiCategory, setPoiCategory] = useState('all');
-  const [pois, setPois] = useState([]);
-  const [loadingPOIs, setLoadingPOIs] = useState(false);
-
-  // Auto-set default Destination and Origin from active stations
-  useEffect(() => {
-    if (activeStations.length > 0) {
-      if (!routeDestination) {
-        const dest = activeStations[0];
-        setRouteDestination({
-          name: dest.name || dest.id,
-          lat: dest.latitude || 12.9756,
-          lng: dest.longitude || 77.6066,
-          id: dest.id
-        });
-      }
-      if (!routeOrigin && activeStations.length > 1) {
-        const orig = activeStations[1];
-        setRouteOrigin({
-          name: orig.name || orig.id,
-          lat: orig.latitude || 13.0358,
-          lng: orig.longitude || 77.5970,
-          id: orig.id
-        });
-      }
-    }
-  }, [stations]);
-
-  // Load Overpass POIs when toggled
-  useEffect(() => {
-    if (!showPOIs) {
-      setPois([]);
-      return;
-    }
-    setLoadingPOIs(true);
-    const centerLat = currentLocation?.lat || 12.9716;
-    const centerLng = currentLocation?.lng || 77.5946;
-
-    getNearbyPOIs(centerLat, centerLng, 2800, poiCategory)
-      .then((data) => {
-        setPois(Array.isArray(data) ? data : []);
-      })
-      .catch((err) => {
-        console.error('Error fetching OSM POIs:', err);
-        setPois([]);
-      })
-      .finally(() => {
-        setLoadingPOIs(false);
-      });
-  }, [showPOIs, poiCategory, currentLocation]);
-
-  // 1. Handle Map Click (Place Marker & Reverse Geocode)
   const handleMapClick = ({ lat, lng }) => {
     const pinNumber = customMarkers.length + 1;
     const newPin = {
       id: `PIN-${pinNumber}`,
-      name: `Custom Map Pin #${pinNumber}`,
+      name: `User pin #${pinNumber}`,
       lat,
       lng,
       latitude: lat,
       longitude: lng,
-      isCustomPin: true
+      isCustomPin: true,
     };
-
     setCustomMarkers((prev) => [...prev, newPin]);
     setSelectedNode(newPin);
-
-    // If no origin set, set as origin; else if no destination set, set as destination
-    if (!routeOrigin) {
-      setRouteOrigin({ name: newPin.name, lat, lng, id: newPin.id });
-    } else if (!routeDestination) {
-      setRouteDestination({ name: newPin.name, lat, lng, id: newPin.id });
-    }
   };
 
-  // 2. Handle Search Selection
-  const handleSelectPlace = (place) => {
-    const loc = {
-      ...place,
-      lat: place.latitude,
-      lng: place.longitude,
-      id: `SEARCH-${place.place_id || Date.now()}`
-    };
-    setSearchedLocation(loc);
-    setSelectedNode(loc);
-    setRouteOrigin({ name: place.name || 'Searched Location', lat: loc.lat, lng: loc.lng, id: loc.id });
-  };
-
-  // 3. Handle Current Location Found (GPS)
   const handleLocationFound = (loc) => {
     setCurrentLocation(loc);
-    const locNode = {
+    setSelectedNode({
       id: 'MY-LOCATION',
-      name: 'My Current Location (GPS)',
+      name: 'Browser-reported location',
       lat: loc.lat,
       lng: loc.lng,
       latitude: loc.lat,
       longitude: loc.lng,
-      accuracy: loc.accuracy
-    };
-    setSelectedNode(locNode);
-    setRouteOrigin({ name: 'My Current Location', lat: loc.lat, lng: loc.lng, id: 'MY-LOCATION' });
-  };
-
-  // 4. Handle Deleting Custom Marker
-  const handleDeleteCustomMarker = (pinId) => {
-    setCustomMarkers((prev) => prev.filter((p) => p.id !== pinId));
-    if (selectedNode?.id === pinId) {
-      setSelectedNode(null);
-    }
-    if (routeOrigin?.id === pinId) setRouteOrigin(null);
-    if (routeDestination?.id === pinId) setRouteDestination(null);
-  };
-
-  // 5. Swap Origin & Destination
-  const handleSwapPoints = () => {
-    const temp = routeOrigin;
-    setRouteOrigin(routeDestination);
-    setRouteDestination(temp);
-    setActiveRoute(null);
-  };
-
-  // 6. Set Preset Route
-  const handleSelectPreset = (presetOrigin, presetDest) => {
-    setRouteOrigin(presetOrigin);
-    setRouteDestination(presetDest);
-    setActiveRoute(null);
+      accuracy: loc.accuracy,
+    });
   };
 
   return (
-    <div className="glass-panel p-4 sm:p-5 border border-[#202F49] space-y-4 font-sans shadow-2xl">
-      {/* Top Header & Open Source Tech Badges */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#202F49] pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-[#162238] border border-[#2563EB] text-[#38BDF8] flex items-center justify-center shrink-0 shadow-md">
-            <Navigation className="w-4 h-4 text-[#38BDF8]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider font-heading">
-                OpenStreetMap Navigation & EV Corridor Map
-              </h3>
-              <span className="px-2 py-0.2 bg-[#0E201B] border border-emerald-600 text-emerald-400 font-mono text-[9px] font-bold uppercase tracking-wider">
-                Leaflet • OpenStreetMap • OSRM
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              100% Free & Open-Source. OpenStreetMap tiles, Nominatim geocoding, and OSRM road routing.
+    <section className="ai-card section space-y-4 font-sans">
+      <div className="section-head">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500">
+            <Navigation className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="section-title">Charging network map</h3>
+            <p className="section-desc">
+              Station coordinates come from the local dataset snapshot; status and vehicle positions come
+              from the simulation.
             </p>
           </div>
         </div>
-
-        {/* Current Location Trigger */}
         <CurrentLocation onLocationFound={handleLocationFound} />
       </div>
 
-      {/* Nominatim Search Bar & POI Filter Row */}
-      <div className="space-y-2">
-        <MapSearch
-          onSelectPlace={handleSelectPlace}
-          onClearSearch={() => setSearchedLocation(null)}
-        />
-
-        <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
-          <POIFilterControl
-            showPOIs={showPOIs}
-            onToggleShowPOIs={setShowPOIs}
-            selectedCategory={poiCategory}
-            onSelectCategory={setPoiCategory}
-            poiCount={pois.length}
-            loading={loadingPOIs}
-          />
-
-          {/* Map Legend */}
-          <div className="flex items-center gap-3 text-[11px] text-slate-300 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-[#1D4ED8] border border-white"></span>
-              <span className="text-[#38BDF8]">EV Hub ({activeStations.length})</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-              <span className="text-emerald-400">My Location</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-amber-500"></span>
-              <span className="text-amber-400">Custom Pin</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-rose-600"></span>
-              <span className="text-rose-400">Ambulance</span>
-            </div>
-          </div>
-        </div>
+      {/* Measured counts, straight from the environment snapshot */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Stations in dataset" value={stations.length} size="sm" />
+        <StatTile label="Operational now" value={operationalCount} tone="success" size="sm" />
+        <StatTile label="Chargers modelled" value={totalChargers} tone="primary" size="sm" />
+        <StatTile label="Vehicles in simulation" value={evs.length} size="sm" />
       </div>
 
-      {/* The Leaflet Interactive Map View */}
       <MapView
-        stations={activeStations}
+        stations={stations}
         evs={evs}
         customMarkers={customMarkers}
         currentLocation={currentLocation}
-        searchedLocation={searchedLocation}
-        pois={pois}
-        activeRoute={activeRoute}
         onMapClick={handleMapClick}
         onSelectNode={setSelectedNode}
         selectedNodeId={selectedNode?.id}
       />
 
-      {/* Bottom Panel: Route Planning (OSRM) & Selected Place Details (Nominatim) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* OSRM Route Control */}
-        <RouteControl
-          origin={routeOrigin}
-          destination={routeDestination}
-          activeRoute={activeRoute}
-          onRouteCalculated={setActiveRoute}
-          onClearRoute={() => setActiveRoute(null)}
-          onSwapPoints={handleSwapPoints}
-          onSelectPreset={handleSelectPreset}
-        />
-
-        {/* Selected Place / Marker Details with Reverse Geocoding */}
-        <PlaceDetails
-          selectedNode={selectedNode}
-          onClose={() => setSelectedNode(null)}
-          onSetOrigin={(node) => {
-            const lat = node.lat ?? node.latitude;
-            const lng = node.lng ?? node.longitude;
-            setRouteOrigin({ name: node.name || node.id, lat, lng, id: node.id });
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-blue-700 border border-white rounded-sm" />
+          <span>Charging station</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+          <span>Browser location</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 bg-amber-500 rounded-sm" />
+          <span>User pin</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCustomMarkers([]);
+            setSelectedNode(null);
           }}
-          onSetDestination={(node) => {
-            const lat = node.lat ?? node.latitude;
-            const lng = node.lng ?? node.longitude;
-            setRouteDestination({ name: node.name || node.id, lat, lng, id: node.id });
-          }}
-          onDeleteCustomMarker={handleDeleteCustomMarker}
-        />
+          disabled={customMarkers.length === 0}
+          className="btn-ghost btn-sm ml-auto"
+        >
+          Clear user pins
+        </button>
       </div>
-    </div>
+
+      {selectedNode && (
+        <div className="ai-card-flat space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-900">{selectedNode.name}</span>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setSelectedNode(null)}>
+              Close
+            </button>
+          </div>
+          <KeyValueGrid
+            columns={2}
+            items={[
+              {
+                term: 'Coordinates',
+                value: `${(selectedNode.lat ?? selectedNode.latitude)?.toFixed?.(4) ?? '—'}, ${
+                  (selectedNode.lng ?? selectedNode.longitude)?.toFixed?.(4) ?? '—'
+                }`,
+                mono: true,
+              },
+              ...(selectedNode.accuracy !== undefined
+                ? [
+                    {
+                      term: 'Reported accuracy',
+                      value:
+                        typeof selectedNode.accuracy === 'number'
+                          ? `${selectedNode.accuracy.toFixed(0)} m`
+                          : String(selectedNode.accuracy),
+                      mono: true,
+                    },
+                  ]
+                : []),
+            ]}
+          />
+          {selectedNode.isCustomPin && (
+            <p className="text-xs text-slate-500">
+              User pin created in the browser; it is not stored on the server.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Station table: the same source of truth the search algorithms read */}
+      <div className="ai-table-container">
+        <table className="ai-table">
+          <thead>
+            <tr>
+              <th>Station</th>
+              <th>Operator</th>
+              <th className="num">Power</th>
+              <th className="num">Chargers free</th>
+              <th className="num">Tariff</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stations.map((st) => {
+              const available = (st.chargers || []).filter((c) => c.current_status === 'AVAILABLE').length;
+              return (
+                <tr key={st.id}>
+                  <td>
+                    <div className="font-medium text-slate-900">{st.name}</div>
+                    <div className="col-code">{st.id}</div>
+                  </td>
+                  <td className="text-slate-600">{st.operator_name || '—'}</td>
+                  <td className="num">{st.charging_power ? `${Number(st.charging_power).toFixed(0)} kW` : '—'}</td>
+                  <td className="num">
+                    <span className="inline-flex items-center gap-1">
+                      <Zap className="h-3 w-3 text-blue-600" />
+                      {available}/{st.chargers?.length || 0}
+                    </span>
+                  </td>
+                  <td className="num">
+                    {typeof st.energy_price === 'number' ? `$${Number(st.energy_price).toFixed(3)}/kWh` : '—'}
+                  </td>
+                  <td>
+                    {st.operating_status === 'OPERATIONAL' ? (
+                      <span className="badge-emerald">
+                        <CheckCircle2 className="h-3 w-3" /> Operational
+                      </span>
+                    ) : (
+                      <span className="badge-rose">
+                        <Shield className="h-3 w-3" /> {st.operating_status}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="flex items-start gap-2 text-xs text-slate-500">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+        Station metadata is a static public-dataset snapshot (location, operator, ports, published tariff).
+        Occupancy, faults and vehicle positions are simulated. No external map, geocoding or routing API is called.
+      </p>
+    </section>
   );
 }

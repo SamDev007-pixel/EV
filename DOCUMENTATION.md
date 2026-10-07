@@ -1,614 +1,448 @@
 # Intelligent EV Charging & Resource Management System
-## Complete Technical Documentation & Engineering Specifications
 
-**System Classification**: Classical Artificial Intelligence System for Urban Smart Microgrid & EV Fleet Infrastructure  
-**Core Methodology**: Multi-Agent System (FIPA-ACL) • A* Heuristic Search • First-Order Logic Inference • Backtracking CSP (MRV/LCV/AC-3) • Nash Bargaining Game Theory  
-**Data Infrastructure**: Real-World Pan-India POI Data (OpenStreetMap, Nominatim, OSRM, Overpass & Open Charge Map API v3) + Discrete-Event Simulation Telemetry  
-**Strict Architectural Guarantee**: 100% Classical Symbolic AI (Zero Neural Networks, Zero Deep Learning, Zero LLMs/Generative Models)
+## Technical Documentation
+
+A decision-support platform for allocating electric vehicles to charging stations and scheduling their
+charging sessions. All reasoning is classical and symbolic — graph search, constraint satisfaction,
+rule-based inference and game theory — and every decision is reproducible and explainable. The system
+contains no machine learning of any kind.
+
+**Version 1.0 · backends: FastAPI (Python 3.10+) · frontend: React + Vite · tests: 124 passing**
 
 ---
 
 ## Table of Contents
+
 1. [Executive Summary](#1-executive-summary)
-2. [Problem Statement & Mathematical Formulation](#2-problem-statement--mathematical-formulation)
+2. [Problem Statement](#2-problem-statement)
 3. [PEAS Environment Specification](#3-peas-environment-specification)
-4. [Classical AI Algorithms (The 5 Core Engines)](#4-classical-ai-algorithms-the-5-core-engines)
-   - [4.1 Multi-Agent System (MAS) & FIPA-ACL Protocol](#41-multi-agent-system-mas--fipa-acl-protocol)
-   - [4.2 Knowledge Base & First-Order Symbolic Inference Engine](#42-knowledge-base--first-order-symbolic-inference-engine)
-   - [4.3 Classical Graph Search & Heuristic Station Selection (A* Search)](#43-classical-graph-search--heuristic-station-selection-a-search)
-   - [4.4 Backtracking Constraint Satisfaction Problem (CSP) Scheduler](#44-backtracking-constraint-satisfaction-problem-csp-scheduler)
-   - [4.5 Game-Theoretic Multi-Agent Conflict Resolution (Nash Bargaining)](#45-game-theoretic-multi-agent-conflict-resolution-nash-bargaining)
-5. [Real-World Geographic Dataset & Data Integrity](#5-real-world-geographic-dataset--data-integrity)
-6. [Dynamic Stress Scenarios & Fault Resilience](#6-dynamic-stress-scenarios--fault-resilience)
-7. [Comparative Benchmark Results & Empirical Evaluation](#7-comparative-benchmark-results--empirical-evaluation)
-8. [Frontend Architecture & Operational System Views](#8-frontend-architecture--operational-system-views)
-9. [Codebase Organization & File Structure](#9-codebase-organization--file-structure)
-10. [Installation, Setup & Deployment Guide](#10-installation-setup--deployment-guide)
-11. [AI Syllabus Mapping (Units I–V) & Viva Guide](#11-ai-syllabus-mapping-units-iv--viva-guide)
-12. [Academic Honesty & No-ML/No-LLM Verification](#12-academic-honesty--no-mlno-llm-verification)
+4. [Architecture](#4-architecture)
+5. [Algorithms](#5-algorithms)
+6. [Data Model, Sources and Provenance](#6-data-model-sources-and-provenance)
+7. [API Reference](#7-api-reference)
+8. [Frontend](#8-frontend)
+9. [Simulation and Injectable Events](#9-simulation-and-injectable-events)
+10. [Evaluation](#10-evaluation)
+11. [Setup and Deployment](#11-setup-and-deployment)
+12. [Testing and Verification](#12-testing-and-verification)
+13. [Limitations and Scope](#13-limitations-and-scope)
+14. [Glossary](#14-glossary)
 
 ---
 
 ## 1. Executive Summary
 
-The **Intelligent EV Charging & Resource Management System** is an end-to-end, enterprise-grade engineering platform designed to resolve urban electric vehicle (EV) charging congestion, local distribution grid transformer overloads, and dynamic energy resource allocation.
+Urban fast-charging creates three coupled problems: the local transformer can be overloaded when many
+vehicles charge at once; drivers crowd the most convenient hub while other hubs sit idle; and the four
+parties involved — driver, station operator, grid operator and energy supplier — want different things.
 
-As urban EV adoption accelerates across metropolitan centers, uncoordinated fast charging creates severe localized grid power spikes, excessive waiting queues at popular charging hubs, and economic inefficiencies. Conventional heuristic methods (such as First-Come-First-Served or Nearest Station greedy assignment) fail under peak loads because they lack holistic multi-objective coordination.
+The system takes one vehicle request (state of charge, target charge, deadline, priority, connector,
+location) and produces a decision: **which station, which charger, which time slot, at what power**,
+together with a route and an explicit verdict for each hard constraint. It then stores the full
+reasoning trace so the decision can be inspected or retrieved later by decision id.
 
-This platform implements a **pure Classical Artificial Intelligence** architecture combining:
-- **Symbolic Logic & Knowledge Representation**: Forward-chaining production rules with verifiable logical deduction and human-interpretable `WHY` explanation traces.
-- **Informed Graph Search**: Admissible A* pathfinding and multi-factor heuristic evaluations ($h(n)$) across road network graphs.
-- **Constraint Satisfaction Programming**: Backtracking search with Forward Checking (`FC`), Arc Consistency (`AC-3`), Minimum Remaining Values (`MRV`), and Least Constraining Value (`LCV`) heuristics enforcing 8 rigid physical grid and vehicle constraints.
-- **Game Theory & Microeconomics**: Multi-agent Nash Bargaining Solutions maximizing joint welfare along the Pareto-optimal frontier.
-
-All decisions generated by this system are **100% deterministic, mathematically explainable, auditable, and reproducible**.
+Everything is deterministic. A fixed random seed reproduces a run exactly, and a fixed request
+reproduces a decision exactly; both properties are covered by tests. There are no learned weights,
+no probability distributions fitted to data, and no model-serving dependencies.
 
 ---
 
-## 2. Problem Statement & Mathematical Formulation
+## 2. Problem Statement
 
-### 2.1 The Urban EV Infrastructure Trilemma
-Urban charging networks operate under three competing, conflicting pressures:
-1. **EV Drivers (Demand Side)**: Seek to minimize total journey latency (travel time $t_{\text{travel}} + \text{queue wait time } t_{\text{wait}} + \text{charging duration } t_{\text{charge}}$), minimize monetary cost, and ensure arrival before battery exhaustion ($\text{SoC} > 0\%$) and departure deadlines.
-2. **Charging Station Operators (Service Side)**: Aim to maximize charger port utilization rates ($>85\%$), optimize electrical throughput, and prevent equipment wear.
-3. **Power Grid Operators (Resource Side)**: Must strictly maintain total active load below localized transformer thermal ratings ($P_{\text{grid}} \le P_{\max}$), smooth peak-to-average demand ratios, and prioritize zero-marginal-cost renewable energy (solar photovoltaic arrays).
+Given a network of charging stations with a shared transformer capacity, a set of vehicles each with a
+battery state, a deadline and a priority, and a set of hard physical and electrical constraints,
+produce an assignment and schedule that:
 
-### 2.2 Global Optimization Objective
-The urban resource management task is formalized as a constrained multi-objective optimization problem:
+- satisfies every hard constraint (charger exclusivity, station power capacity, transformer capacity,
+  deadline, per-vehicle power limit, connector compatibility, minimum delivered energy, station
+  operational status);
+- does not exceed the transformer rating;
+- meets deadlines where physically possible; and
+- can be justified step by step.
 
-$$\min_{X} \quad \Phi(X) = \sum_{i \in \mathcal{V}} \left[ w_1 \cdot t_{\text{wait}}(i) + w_2 \cdot d_{\text{travel}}(i) + w_3 \cdot C_{\text{charge}}(i) \right] - w_4 \cdot E_{\text{solar\_used}}$$
-
-$$\text{Subject to:}$$
-- **Transformer Thermal Ceiling**: $\sum_{s \in \mathcal{S}} P_s(t) \le P_{\text{grid\_max}}(t), \quad \forall t \in \mathcal{T}$
-- **Station Peak Capacity**: $\sum_{k \in \mathcal{C}_s} P_{s,k}(t) \le P_{s,\max}, \quad \forall s \in \mathcal{S}, \forall t$
-- **Charger Exclusivity**: $\sum_{i \in \mathcal{V}} \mathbf{1}_{\{X_i = (s, k, t)\}} \le 1, \quad \forall s, k, t$
-- **Deadline Satisfaction**: $t_{\text{start}}(i) + t_{\text{duration}}(i) \le t_{\text{deadline}}(i), \quad \forall i \in \mathcal{V}$
-- **Emergency Invariance**: $P_{\text{alloc}}(e) = P_{\max}(e), \quad \forall e \in \mathcal{V}_{\text{emergency}}$
-
-Where $\mathcal{V}$ is the set of active EVs, $\mathcal{S}$ is the set of charging stations, $\mathcal{C}_s$ is the set of charging ports at station $s$, and $\mathcal{T}$ is the discretized scheduling horizon.
+Naive policies fail in specific, measurable ways: First-Come-First-Served and nearest-station
+assignment both admit every vehicle immediately and let the modelled transformer overload, which is why
+they record many overload incidents in the benchmark despite looking fast (§10).
 
 ---
 
 ## 3. PEAS Environment Specification
 
-In accordance with Russell & Norvig's classical AI framework, the system is specified as a rational agent operating in a well-defined PEAS environment:
+The PEAS description is served by `GET /api/peas` (source: `backend/app/core/peas.py`) alongside the
+metrics the running system actually measures.
 
-| PEAS Component | System Implementation & Physical Correlates |
+| Component | Description |
 | :--- | :--- |
-| **Performance Measure ($P$)** | - **Wait Time Minimization**: Reduce driver queue delays (benchmark target: $< 5.0$ minutes).<br>- **Grid Safety**: Zero ($0.0$) transformer overloads exceeding rated threshold ($300-450\text{ kW}$).<br>- **Station Utilization**: Maintain balanced port utilization exceeding $85\%$.<br>- **Emergency Guarantee**: $100\%$ on-time allocation and preemption for emergency vehicles (Ambulance 108).<br>- **Renewable Integration**: Maximize consumption of localized solar photovoltaic generation ($120\text{ kW}$ peak).<br>- **Economic Efficiency**: Minimize cost per kWh through off-peak and solar-backed charging. |
-| **Environment ($E$)** | - **Road Topology Graph**: Urban metropolitan street network (coordinates, distances, travel speeds).<br>- **Heterogeneous Stations**: 72 real-world Indian charging stations (Shell, BPCL, Ather Grid, Jio-bp, Zeon, ChargeZone) with CCS2 ($50-150\text{ kW}$ DC) and Type-2 ($7.4-22\text{ kW}$ AC) chargers.<br>- **Dynamic Microgrid**: Grid transformer load profile with stochastic baseload demands.<br>- **Solar Array**: Variable solar irradiance output curve ($0-120\text{ kW}$).<br>- **Stochastic EV Influx**: Commuter fleets, commercial rideshare EVs, and emergency vehicles arriving dynamically. |
-| **Actuators ($A$)** | - **Station Assignment & Rerouting**: Directing EVs to optimal spatial charging hubs.<br>- **Charger Port Reservation**: Reserving specific physical connectors ($k \in \mathcal{C}_s$).<br>- **Discrete Slot Scheduling**: Assigning exact start and end times $[t_{\text{start}}, t_{\text{end}}]$.<br>- **Dynamic Power Throttling**: Stepwise adjustment of charger power output ($25\text{ kW}, 50\text{ kW}, 100\text{ kW}, 150\text{ kW}$).<br>- **Preemption Actuation**: Halting or shifting low-priority charging sessions to accommodate critical emergency vehicles.<br>- **Solar Power Dispatch**: Prioritizing direct solar inverter feeds to active EV chargers. |
-| **Sensors ($S$)** | - **EV Telemetry**: Current State of Charge (SoC $\%$, $0-100\%$), battery capacity ($\text{kWh}$), maximum onboard charging rate ($\text{kW}$), GPS coordinates $(x, y)$, and user departure deadline.<br>- **Station Sensors**: Charger operational status (`OPERATIONAL`, `OCCUPIED`, `FAULT`), physical plug type compatibility, and local station power draw ($\text{kW}$).<br>- **Grid Telemetry**: Substation transformer load meter ($\text{kW}$) and thermal threshold alerts.<br>- **Meteorological/Solar Sensor**: Solar generation inverter power output ($\text{kW}$). |
+| **Performance measure** | Minimise average queuing/charging wait; keep modelled transformer load below its rating; maximise charger utilisation; serve emergency-priority vehicles first; meet deadlines. Each is counted from the simulation, not assumed. |
+| **Environment** | 22 stations / 76 chargers on a road-network graph. Station metadata is a static snapshot of public station records; occupancy, faults, queue state and grid load are simulated. |
+| **Actuators** | Station and charger assignment; charging time slot; session power (kW); emergency queue pre-emption; deferral when transformer headroom is exhausted. |
+| **Sensors** | User-input request fields; charger/station status and transformer load from the environment snapshot; and the knowledge-base facts derived from those by the rule engine. |
+
+**Environment classification** (as returned by the endpoint):
+
+| Property | Value |
+| :--- | :--- |
+| Observability | Partially observable — future arrivals and station faults are unknown when the agent plans |
+| Determinism | Deterministic for a fixed seed; treated as nondeterministic by the agent because future arrivals and faults are unknown in advance |
+| Episodicity | Sequential — each scheduling decision changes the state later decisions see |
+| Dynamism | Dynamic — the environment keeps changing while the agent deliberates |
+| Agents | Multi-agent (EV, station, grid, energy, coordinator) |
+| Continuity | Discrete — integer-minute ticks, 15-minute charging slots |
+
+**Hardware note:** this is a software agent. There is no physical sensor, vehicle telemetry unit or
+charging hardware anywhere in the system. The "sensors" are form input and simulation state, and the
+"actuators" are decisions written into that simulation state.
 
 ---
 
-## 4. Classical AI Algorithms (The 5 Core Engines)
-
-### 4.1 Multi-Agent System (MAS) & FIPA-ACL Protocol
-
-The system organizes decentralized entities into autonomous software agents adhering to the **IEEE FIPA (Foundation for Intelligent Physical Agents)** Agent Communication Language (ACL) standard.
-
-#### Agent Taxonomy:
-1. **EV Agent ($\text{Ag}_{\text{EV}}$)**: Autonomous agent instantiated for each vehicle. Monitors battery SoC, calculates required energy $\Delta E = (\text{SoC}_{\text{target}} - \text{SoC}_{\text{curr}}) \cdot C_{\text{battery}}$, tracks user budget, and negotiates charging slots before deadlines.
-2. **Station Agent ($\text{Ag}_{\text{CS}}$)**: Manages physical hardware chargers at a charging hub. Tracks port availability, connector types, local power transformer headroom, and pricing schedules.
-3. **Grid Agent ($\text{Ag}_{\text{Grid}}$)**: Acts as the smart microgrid guardian. Continuously evaluates total aggregated power draw against substation transformer capacity ($300-450\text{ kW}$) and issues mandatory throttling constraints when overloads loom.
-4. **Energy Agent ($\text{Ag}_{\text{Solar}}$)**: Monitors on-site solar generation curves and battery storage reserves. Injects low-cost, zero-emission power into the scheduling pool.
-5. **Coordinator Agent ($\text{Ag}_{\text{Coord}}$)**: Central facilitator that executes global search, runs the CSP constraint engine, and chairs multi-agent Nash bargaining sessions.
-
-#### FIPA-ACL Message Schema:
-Every message transmitted between agents contains formal ontological metadata:
-```json
-{
-  "performative": "PROPOSE",
-  "sender": "StationAgent-CS1",
-  "receiver": "CoordinatorAgent",
-  "ontology": "EV-Charging-Scheduling",
-  "conversation_id": "conv-tx-9482",
-  "reply_with": "msg-101",
-  "content": {
-    "station_id": "CS1",
-    "charger_id": "CH-02",
-    "slot_start": "14:30",
-    "slot_end": "15:00",
-    "allocated_power_kw": 50.0,
-    "tariff_per_kwh": 8.50
-  }
-}
-```
-**Supported FIPA Performatives**: `REQUEST`, `INFORM`, `PROPOSE`, `ACCEPT_PROPOSAL`, `REJECT_PROPOSAL`, `CFP` (Call for Proposals), `QUERY_IF`, and `FAILURE`.
-
----
-
-### 4.2 Knowledge Base & First-Order Symbolic Inference Engine
-
-The symbolic reasoning subsystem implements a **First-Order Logic (FOL) Rule-Based Expert System** with a Rete-like forward-chaining deduction loop and backward-chaining goal verification.
-
-#### Fact Base Representation:
-Facts are stored as first-order predicate triples:
-```
-(Subject, Predicate, Object/Value)
-Examples:
-  (EV-108, is_emergency, true)
-  (EV-108, battery_soc, 12.0)
-  (CS-METRO, operational_status, FAULT)
-  (Grid-Transformer, current_load_kw, 290.0)
-  (Grid-Transformer, rated_capacity_kw, 300.0)
-  (Solar-Array, generation_kw, 95.0)
-```
-
-#### Core Production Rules:
-1. **Rule R-PRIORITY-01 (Emergency Preemption)**:
-   $$\forall x : \text{is\_emergency}(x) \lor \text{battery\_soc}(x) < 15.0\% \implies \text{charging\_priority}(x, \text{CRITICAL})$$
-2. **Rule R-GRID-01 (Transformer Overload Hazard)**:
-   $$\forall s, p : (\text{grid\_load} + p > \text{transformer\_capacity}) \implies \text{assert}(\text{grid\_overload\_imminent}) \land \text{retract}(\text{allow\_max\_power})$$
-3. **Rule R-SOLAR-01 (Green Renewable Preference)**:
-   $$\forall t : (\text{solar\_generation}(t) > 60.0\text{ kW}) \implies \text{recommend\_solar\_hub}(t) \land \text{apply\_discount}(\text{tariff}, 20\%)$$
-4. **Rule R-FAULT-01 (Dynamic Station Rerouting)**:
-   $$\forall s : \text{status}(s, \text{FAULT}) \implies \forall x : \text{assigned}(x, s) \implies \text{trigger\_reroute}(x)$$
-
-#### Step-by-Step "WHY" Explanation Deductions:
-When an operator queries why EV-108 received instantaneous charger preemption at Station CS-1, the inference engine generates an explicit, auditable derivation tree:
-```
-[LOGICAL DERIVATION PROOF: WHY(EV-108, Priority=CRITICAL)]
-  1. FACT ASSERTED: (EV-108, vehicle_type, "Ambulance-108") [Source: TelemetrySensor]
-  2. FACT ASSERTED: (EV-108, battery_soc, 11.4%)            [Source: BatterySensor]
-  3. RULE MATCHED: R-PRIORITY-01 IF is_emergency(x) == True THEN priority(x) = CRITICAL
-  4. INFERENCE: EV-108 matches antecedent 'is_emergency(EV-108) = True'.
-  5. DEDUCTION: Asserting (EV-108, charging_priority, CRITICAL).
-  6. RULE MATCHED: R-PREEMPTION-01 IF priority(x) == CRITICAL and queue_wait > 0 THEN preempt_lowest_priority()
-  7. DEDUCTION: Preempting EV-04 (priority=STANDARD, SoC=78%) -> Reallocating Port CH-01 to EV-108.
-```
-
----
-
-### 4.3 Classical Graph Search & Heuristic Station Selection (A* Search)
-
-When an EV initiates a charging request, the system evaluates candidate paths across the spatial transportation network using informed and uninformed classical search algorithms.
-
-#### Algorithms Implemented for Comparative Evaluation:
-- **Breadth-First Search (BFS)**: Explores network systematically by hop count. Optimal for unweighted graphs; ignores queue delays and power capacities.
-- **Depth-First Search (DFS)**: Explores deep path branches. Non-optimal, high memory risk in cyclical networks.
-- **Uniform Cost Search (UCS)**: Dijkstra-equivalent; expands lowest cumulative path cost $g(n)$. Guarantees shortest physical travel distance but ignores downstream charger queues.
-- **Greedy Best-First Search (GBFS)**: Expands strictly based on $h(n)$. Vulnerable to local minima.
-- **A* Search (Primary Production Engine)**: Expands node minimizing $f(n) = g(n) + h(n)$.
-
-#### Multi-Factor Admissible Heuristic Formulation:
-The domain heuristic $h(n)$ models the estimated cost from candidate node $n$ to destination state:
-
-$$h(n) = w_d \cdot \frac{D(n, \text{goal})}{v_{\text{avg}}} + w_q \cdot Q_{\text{delay}}(n) + w_c \cdot \left(\frac{C_{\text{tariff}}(n)}{C_{\max}}\right) + w_p \cdot \max\left(0, \frac{P_{\text{req}} - P_{\text{station}}(n)}{P_{\text{req}}}\right)$$
-
-Where:
-- $D(n, \text{goal}) / v_{\text{avg}}$: Normalized straight-line Euclidean travel time lower bound.
-- $Q_{\text{delay}}(n) = \text{queue\_length}(n) \times \bar{t}_{\text{service}}$: Estimated queuing delay.
-- $C_{\text{tariff}}(n) / C_{\max}$: Normalized electricity tariff cost.
-- $P_{\text{station}}(n)$: Maximum power supported by station's compatible charger.
-
-#### Heuristic Formulations & Mathematical Analysis:
-1. **Admissible Euclidean Lower Bound ($h_{\text{dist}}(n)$)**:
-   The straight-line spatial distance heuristic estimates the minimum physical road distance to the goal divided by maximum vehicle speed:
-   $$h_{\text{dist}}(n) = \frac{D(n, \text{goal})}{v_{\max}}$$
-   Since Euclidean distance is strictly less than or equal to true road network distance (triangle inequality), $h_{\text{dist}}(n) \le h^*(n)$ holds unconditionally, guaranteeing admissibility and monotonicity.
-
-2. **Domain-Specific Station Recommendation Heuristic ($h_{\text{domain}}(n)$)**:
-   For comprehensive real-world EV hub recommendation, the system incorporates queue wait times, energy tariffs, and power mismatch:
-   $$h_{\text{domain}}(n) = w_d \cdot \frac{D(n, \text{goal})}{v_{\text{avg}}} + w_q \cdot Q_{\text{delay}}(n) + w_c \cdot \left(\frac{C_{\text{tariff}}(n)}{C_{\max}}\right) + w_p \cdot \max\left(0, \frac{P_{\text{req}} - P_{\text{station}}(n)}{P_{\text{req}}}\right)$$
-   *Academic Note*: This multi-objective engineering heuristic balances journey time, wait queues, and electricity cost for optimal driver satisfaction; it is evaluated against the admissible Euclidean baseline during viva demonstrations.
-
----
-
-### 4.4 Backtracking Constraint Satisfaction Problem (CSP) Scheduler
-
-Charging slot assignment is formalized as a discrete **Constraint Satisfaction Problem (CSP)** defined by the tuple $\langle \mathcal{X}, \mathcal{D}, \mathcal{C} \rangle$.
-
-#### Variables ($\mathcal{X}$):
-For each registered vehicle $i \in \mathcal{V}$:
-$$X_i = \langle \text{Station}_i, \text{Charger}_i, \text{Slot}_i, \text{Power}_i \rangle$$
-
-#### Domains ($\mathcal{D}$):
-- $\text{Station}_i \in \{ \text{CS-1}, \text{CS-2}, \dots, \text{CS-72} \}$
-- $\text{Charger}_i \in \{ \text{CH-01}, \text{CH-02}, \dots, \text{CH-}k \}$
-- $\text{Slot}_i \in [t_{\text{arrival}}(i), t_{\text{deadline}}(i) - t_{\text{duration}}(i)]$ (quantized into 15-minute intervals)
-- $\text{Power}_i \in \{ 25\text{ kW}, 50\text{ kW}, 100\text{ kW}, 150\text{ kW} \}$
-
-#### The 8 Hard Physical Constraints ($\mathcal{C}$):
-1. **$C_1$ — Charger Port Exclusivity (No Overlap)**:
-   $$\forall i \neq j : (\text{Station}_i = \text{Station}_j \land \text{Charger}_i = \text{Charger}_j) \implies [\text{Slot}_i, \text{Slot}_i + \Delta t_i) \cap [\text{Slot}_j, \text{Slot}_j + \Delta t_j) = \emptyset$$
-2. **$C_2$ — Station Power Ceiling**:
-   $$\forall s, \forall t : \sum_{i \in \mathcal{V} \mid \text{Station}_i = s \land t \in [\text{Slot}_i, \text{Slot}_i + \Delta t_i)} \text{Power}_i \le P_{\text{station\_max}}(s)$$
-3. **$C_3$ — Substation Transformer Thermal Limit**:
-   $$\forall t : \sum_{i \in \mathcal{V} \mid t \in [\text{Slot}_i, \text{Slot}_i + \Delta t_i)} \text{Power}_i + P_{\text{baseload}}(t) \le P_{\text{transformer\_limit}} \quad (300-450\text{ kW})$$
-4. **$C_4$ — Departure Deadline Compliance**:
-   $$\forall i : \text{Slot}_i + \Delta t_i \le t_{\text{deadline}}(i)$$
-5. **$C_5$ — EV Battery Acceptance Rate**:
-   $$\forall i : \text{Power}_i \le \min\left(P_{\text{charger\_rated}}(\text{Charger}_i), P_{\text{battery\_max}}(i)\right)$$
-6. **$C_6$ — Physical Connector Compatibility**:
-   $$\forall i : \text{connector\_type}(\text{Charger}_i) \in \text{compatible\_connectors}(i) \quad (\text{CCS2, Type 2, GB/T})$$
-7. **$C_7$ — Energy Balance Feasibility**:
-   $$\forall t : \sum \text{Power}_i(t) \le P_{\text{grid\_available}}(t) + P_{\text{solar}}(t)$$
-8. **$C_8$ — Station Operational Status**:
-   $$\forall i : \text{operational\_status}(\text{Station}_i) \neq \text{FAULT}$$
-
-#### CSP Solver Search Heuristics:
-- **Minimum Remaining Values (MRV / Most Constrained Variable)**: Selects the EV variable with the fewest legal slot-power tuples remaining in its domain (e.g., EVs with imminent departure deadlines or critical $<15\%$ battery).
-- **Degree Heuristic (Tie-Breaker)**: Selects the variable involved in the largest number of constraints with other unassigned variables.
-- **Least Constraining Value (LCV)**: Orders domain values such that the chosen slot/power assignment eliminates the minimum number of valid choices for neighboring EVs.
-- **Forward Checking (FC)**: Immediately prunes conflicting slots from all overlapping EV domains upon each tentative assignment.
-- **Arc Consistency (AC-3 Algorithm)**: Enforces directional arc consistency across the binary constraint network before search commences, collapsing the search space in $O(c \cdot d^3)$ time.
-
----
-
-### 4.5 Game-Theoretic Multi-Agent Conflict Resolution (Nash Bargaining)
-
-When peak arrival waves create resource contention where no single agent can achieve their ideal payoff without degrading others, the system executes an automated **Nash Bargaining Cooperative Negotiation Protocol**.
-
-#### Utility Models ($U_i \in [0, 100]$):
-1. **EV Driver Utility ($U_{\text{EV}}$)**:
-   $$U_{\text{EV}}(a) = 100 - \alpha_1 \cdot \text{WaitTime}(a) - \alpha_2 \cdot \text{Cost}(a) - \alpha_3 \cdot \max(0, \text{FinishTime}(a) - \text{Deadline})$$
-2. **Charging Station Utility ($U_{\text{Station}}$)**:
-   $$U_{\text{Station}}(a) = \beta_1 \cdot \text{Revenue}(a) + \beta_2 \cdot \text{UtilizationRate}(a) - \beta_3 \cdot \text{IdlePortPenalty}(a)$$
-3. **Grid Operator Utility ($U_{\text{Grid}}$)**:
-   $$U_{\text{Grid}}(a) = 100 - \gamma_1 \cdot \max\left(0, \frac{P_{\text{total}}(a) - P_{\text{safe}}}{P_{\text{safe}}}\right) \times 100 - \gamma_2 \cdot \text{RampingRate}(a)$$
-4. **Energy/Solar Utility ($U_{\text{Solar}}$)**:
-   $$U_{\text{Solar}}(a) = \delta_1 \cdot \left(\frac{P_{\text{solar\_consumed}}(a)}{P_{\text{solar\_available}}}\right) \times 100$$
-
-#### Disagreement (Threat) Point ($\mathbf{d}$):
-The threat point $\mathbf{d} = (d_{\text{EV}}, d_{\text{Station}}, d_{\text{Grid}}, d_{\text{Solar}})$ represents the default reservation utility if negotiation collapses:
-- Driver receives no charge and must seek emergency tow ($d_{\text{EV}} = 10$).
-- Station suffers zero revenue and stranded port ($d_{\text{Station}} = 15$).
-- Grid experiences potential uncontrolled tripping ($d_{\text{Grid}} = 20$).
-- Solar power is curtailed with 100% loss ($d_{\text{Solar}} = 0$).
-
-#### Nash Bargaining Solution (NBS):
-The optimal agreement $a^*$ is computed by finding the allocation vector that maximizes the **Nash Product** over the Pareto-efficient agreement space $\mathcal{A}$:
-
-$$a^* = \arg\max_{a \in \mathcal{A}} N(a) = \arg\max_{a \in \mathcal{A}} \prod_{i \in \{\text{EV}, \text{CS}, \text{Grid}, \text{Solar}\}} \max\left(0, U_i(a) - d_i\right)$$
-
-#### Social Welfare Function:
-$$W(a) = \sum_{i} w_i U_i(a)$$
-
-#### The 7-Step Negotiation Protocol:
-1. **Issue Identification**: Coordinator detects conflict (e.g., 3 EVs requesting $150\text{ kW}$ simultaneously with only $220\text{ kW}$ grid headroom remaining).
-2. **Alternative Proposal Generation**: Coordinator generates 5 distinct candidate deal packages (Immediate Max Power, Fair Power Throttling, Staggered Window, Solar Maximization, Spatial Reroute).
-3. **Utility Computation**: Calculating $U_i$ for all participating agents across all 5 deals.
-4. **Pareto Dominance Filtering**: Pruning candidate deals strictly dominated by any alternative ($a \prec b \iff \forall i, U_i(a) \le U_i(b) \land \exists j, U_j(a) < U_j(b)$).
-5. **Nash Product Evaluation**: Computing $N(a)$ across surviving Pareto set.
-6. **Consensus Selection**: Electing $a^* = \arg\max N(a)$.
-7. **Execution & Audit Logging**: Binding commitment broadcasted via FIPA `ACCEPT_PROPOSAL`. Rejected proposals logged with mathematical rationale.
-
----
-
-## 5. Real-World Geographic Dataset & Data Integrity
-
-The system bridges academic artificial intelligence theory with real-world metropolitan EV infrastructure across India.
-
-### 5.1 Geographic Coverage & External Providers
-- **72 Physical Charging Stations**: Real coordinates, verified physical addresses, network branding, connector configurations, and pricing models mapped across major urban centers (**Bengaluru, Chennai, Mumbai, Delhi NCR, Hyderabad, Pune, Kolkata**).
-- **Supported Networks**: Shell Recharge, BPCL Speed, Ather Grid, Jio-bp pulse, Zeon Charging, ChargeZone x BMW, Hyundai EV Ultra-Fast, Relux Electric, and GLIDA.
-- **External Data Providers**:
-  - `OpenChargeMapProvider`: Consumes Open Charge Map API v3 to retrieve real POI metadata, connector types (`CCS2`, `Type 2 AC`, `CHAdeMO`, `LECCS`), and rated kW capacities.
-  - `OSMProvider`: Integrates OpenStreetMap ecosystem services (Nominatim geocoding & reverse geocoding, OSRM driving directions & road distance calculation, and Overpass API POIs).
-
-### 5.2 Academic Data Honesty & Transparency Tagging
-In accordance with academic research integrity standards:
-- **Static Physical Metadata**: Directly pulled from real APIs and tagged as `OPEN_CHARGE_MAP` or `OPENSTREETMAP_VERIFIED`.
-- **Dynamic Operational State**: Because public charging APIs in India do not provide open, unauthenticated real-time socket occupancy or live transformer telemetry, dynamic operational state variables (`AVAILABLE`, `OCCUPIED`, `FAULT`, instantaneous kW draw) are simulated in real time by the internal `SimulationEngine` and explicitly tagged as `SIMULATION_ENGINE`.
-- **Zero Hallucination Guarantee**: Data sources are surfaced transparently on every station card and API response payload.
-
----
-
-## 6. Dynamic Stress Scenarios & Fault Resilience
-
-The platform includes a dedicated stress-testing laboratory to validate classical AI stability under dynamic operational disruptions:
-
-| Scenario Code & Title | Environmental Disturbance | Triggered AI Mechanism | System Action & Outcome |
-| :--- | :--- | :--- | :--- |
-| **SC-01: Peak Demand Spike** | Sudden arrival wave of 15 simultaneous EVs at central hub. | CSP Backtracking + Forward Checking | Solves slot contention without grid breaker trips; automatically staggers start times. |
-| **SC-02: Station CS-METRO Failure** | Station CS-METRO switches from `OPERATIONAL` to `FAULT`. | Symbolic Logic Rule `R-FAULT-01` + A* Heuristic Rerouting | Identifies all impacted queued vehicles; reroutes them to nearby operational stations within battery range. |
-| **SC-03: Grid Overload Mitigation** | Grid transformer limit artificially constricted from $450\text{ kW}$ to $250\text{ kW}$. | Nash Bargaining Multi-Agent Throttling | Dynamically throttles standard charging sessions to $35-50\text{ kW}$; preserves critical sessions; keeps grid load $\le 250\text{ kW}$. |
-| **SC-04: Emergency EV Preemption** | Ambulance-108 arrives with 5% battery SoC requiring immediate power. | Forward Chaining Rule `R-PRIORITY-01` + Preemption Actuator | Immediately halts charging of lowest-priority EV (SoC $>75\%$); reallocates $150\text{ kW}$ Ultra-Fast port to ambulance in $< 1\text{ ms}$. |
-| **SC-05: Renewable Solar Surge** | Solar generation spikes to peak $120\text{ kW}$. | CSP Soft-Constraint Rebalancing + Energy Agent CFP | Shifts upcoming charging slots into the solar window; reduces average driver tariff by $28\%$. |
-
----
-
-## 7. Comparative Benchmark Results & Empirical Evaluation
-
-To evaluate performance, the system was subjected to a standardized benchmark traffic workload consisting of **20 heterogeneous EVs** arriving under constrained grid conditions ($300\text{ kW}$ transformer ceiling). The proposed Classical AI system was evaluated directly against 3 classical baseline strategies.
-
-### 7.1 Baseline Definitions:
-- **Baseline 1: First-Come-First-Served (FCFS)**: Requests are processed in strict arrival order without power throttling or spatial load balancing.
-- **Baseline 2: Nearest Station Greedy Assignment**: Drivers are routed strictly to the physically closest geographic station, irrespective of queue depth or transformer headroom.
-- **Baseline 3: Simple Priority Scheduling**: High-priority EVs are scheduled first, but scheduling lacks forward checking, dynamic throttling, and game-theoretic bargaining.
-
-### 7.2 Empirical Performance Metrics:
-
-| Performance Metric | Baseline 1 (FCFS) | Baseline 2 (Nearest Station) | Baseline 3 (Simple Priority) | Proposed Classical AI System | Improvement vs FCFS |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **Average Queue Wait Time** | $32.7\text{ min}$ | $24.6\text{ min}$ | $14.2\text{ min}$ | **$4.2\text{ min}$** | **$-87.2\%$** |
-| **Average Travel Distance** | $4.8\text{ km}$ | **$2.1\text{ km}$** | $4.2\text{ km}$ | $3.1\text{ km}$ | $-35.4\%$ |
-| **Average Charging Tariff** | $\$11.20$ | $\$10.80$ | $\$9.95$ | **$\$7.40$** | **$-33.9\%$** |
-| **Station Utilization Rate** | $42.5\%$ | $38.0\%$ | $58.4\%$ | **$88.5\%$** | **$+108.2\%$** |
-| **Transformer Overloads ($>300\text{ kW}$)** | 3 Overloads | 4 Overloads | 2 Overloads | **0 Overloads ($0.0$)** | **$100\%$ Eliminated** |
-| **Rescheduled EVs during Disturbances**| 0 | 1 | 4 | **6 EVs** | Full Dynamic Resilience |
-| **Allocation Success Rate** | $75.0\%$ | $70.0\%$ | $85.0\%$ | **$100.0\%$** | **$+33.3\%$** |
-| **Mean Algorithm Runtime** | $0.4\text{ ms}$ | $0.6\text{ ms}$ | $1.2\text{ ms}$ | **$14.8\text{ ms}$** | Real-time Deterministic |
-
-*Key Takeaway*: While Nearest Station achieves the shortest raw travel distance, it creates catastrophic queue clustering ($24.6\text{ min}$ wait) and 4 dangerous transformer overloads. The Proposed Classical AI System sacrifices $1.0\text{ km}$ of travel distance to achieve an $87.2\%$ reduction in wait time, optimal $88.5\%$ station utilization, and zero transformer overload breaches.
-
----
-
-## 8. Frontend Architecture & Operational System Views
-
-The user interface is an engineering-grade, glassmorphic dark telemetry console built using React, Vite, and Tailwind CSS.
-
-### 8.1 Visual Aesthetic & Design Standards:
-- **Palette**: Deep pitch black foundation (`#02060E`, `#000000`), with electric and royal blue accents (`#0356C5`, `#144CCD`, `#2365FF`, `#6694FF`) and crisp white typography.
-- **Surface Elevation**: Figma-inspired 4-layer inner glow shadows (`inset 0 -60px 80px -30px rgba(20, 76, 205, 0.22)`, top highlight rim `#FFFFFF` at $10\%$).
-- **Geometric Architecture**: Zero rounded corners (`border-radius: 0 !important`), crisp technical borders (`#102A56`), and micro-grid layout geometry.
-
-### 8.2 The 9 Specialized Operational Views:
-1. **View 1: Live Network Dashboard (`/`)**:
-   - Interactive GIS Vector Map with road networks, satellite tiles, and custom micro-pin markers for 72 charging stations.
-   - Real-time gauge meters for Substation Transformer Load ($0-300\text{ kW}$) and Rooftop Solar Output ($0-120\text{ kW}$).
-   - Simulation engine speed and tick controls, custom EV injection, and 108 Emergency Ambulance dispatch.
-2. **View 2: Autonomous Smart Agents (`/agents`)**:
-   - Live telemetry feed of all 5 agent classes.
-   - Streaming FIPA-ACL message broker communication log with performative badges and conversation threading.
-3. **View 3: Prolog-Style AI Rules & Logic (`/logic`)**:
-   - Interactive Knowledge Base fact viewer.
-   - Forward-chaining rule execution engine with step-by-step verifiable deduction traces answering `WHY` queries.
-4. **View 4: Station & Route Search Engine (`/search`)**:
-   - Interactive graph topology canvas with collision-free radial node dispersal.
-   - Side-by-side benchmarking of A*, UCS, GBFS, BFS, and DFS with node expansion counts and runtime metrics.
-   - One-click `[Focus Optimal Path]` filter and interactive node telemetry HUD.
-5. **View 5: Smart Scheduler (CSP) (`/csp`)**:
-   - Interactive Gantt chart displaying conflict-free slot assignments across all charger ports.
-   - Live CSP domain state tracking showing variable pruning through Forward Checking and AC-3.
-6. **View 6: Multi-Agent Negotiation (`/negotiation`)**:
-   - Interactive 2D/3D Pareto frontier plot displaying candidate deal allocations.
-   - Nash Product $N(a)$ calculation breakdown, threat point comparison, and social welfare scores.
-7. **View 7: Dynamic Stress Scenarios (`/scenarios`)**:
-   - Interactive scenario trigger matrix for all 5 disturbance test cases with instant state rollback.
-8. **View 8: System Evaluation & PEAS Matrix (`/evaluation`)**:
-   - Comprehensive tabular and graphical comparison of Proposed AI vs Baselines (FCFS, Nearest, Priority).
-   - Real-time PEAS matrix status metrics.
-9. **View 9: In-Car EV Cockpit Dashboard (Full Screen)**:
-   - Immersive in-cockpit instrument cluster featuring real-time speedometer, battery SoC % gauge, estimated range, turn-by-turn navigation HUD, and SOS emergency dispatch.
-
----
-
-## 9. Codebase Organization & File Structure
-
-```
-├── backend/
-│   ├── app/
-│   │   ├── main.py                     # FastAPI application entrypoint & middleware configuration
-│   │   ├── api/
-│   │   │   └── routes.py               # REST API endpoints (/api/simulation, /api/search, /api/csp, etc.)
-│   │   ├── core/
-│   │   │   ├── config.py               # Environment variables, API keys, and global system constants
-│   │   │   └── peas.py                 # PEAS performance metric calculations and state tracking
-│   │   ├── models/
-│   │   │   ├── ev.py                   # Pydantic schemas: EV state, battery specs, priorities
-│   │   │   ├── station.py              # Pydantic schemas: Charging stations, chargers, connector types
-│   │   │   ├── grid.py                 # Pydantic schemas: Transformer loads, capacity thresholds
-│   │   │   └── message.py              # FIPA-ACL message envelope schema
-│   │   ├── simulation/
-│   │   │   ├── engine.py               # Discrete-event simulation clock, arrival queues, state machine
-│   │   │   └── providers.py            # External API adapters (OpenChargeMapProvider, OSMProvider)
-│   │   ├── agents/
-│   │   │   ├── base_agent.py           # Abstract Base Agent with message inbox and lifecycle loops
-│   │   │   ├── ev_agent.py             # EV Agent logic, deadline tracking, utility evaluations
-│   │   │   ├── station_agent.py        # Station Agent logic, queue management, power limits
-│   │   │   ├── grid_agent.py           # Grid Agent logic, transformer thermal monitoring
-│   │   │   ├── energy_agent.py         # Energy Agent logic, solar photovoltaic dispatch
-│   │   │   └── coordinator_agent.py    # Coordinator Agent, master orchestrator
-│   │   ├── knowledge/
-│   │   │   ├── fact_base.py            # Relational triple store (Subject, Predicate, Object)
-│   │   │   ├── rule_base.py            # Production rules: Emergency, Overload, Solar, Fault
-│   │   │   └── inference_engine.py     # Rete-like forward chaining and explainable WHY trace builder
-│   │   ├── search/
-│   │   │   ├── graph.py                # Road network graph representation (nodes, weighted edges)
-│   │   │   ├── heuristics.py           # Multi-factor admissible heuristic h(n) implementation
-│   │   │   └── algorithms.py           # Classical search: BFS, DFS, UCS, GBFS, A* Search
-│   │   ├── csp/
-│   │   │   ├── variables.py            # Charging slot variable definitions
-│   │   │   ├── constraints.py          # The 8 Hard Physical Constraints
-│   │   │   └── solver.py               # Pure Python Backtracking CSP solver with MRV, LCV, AC-3, FC
-│   │   ├── game_theory/
-│   │   │   ├── utility.py              # Mathematical utility models for all 4 agent classes
-│   │   │   ├── negotiation.py          # 7-step Nash Bargaining Protocol implementation
-│   │   │   └── pareto.py               # Non-dominated Pareto frontier filtering algorithms
-│   │   ├── scenarios/
-│   │   │   └── scenario_manager.py     # 5 stress-testing disturbance event handlers
-│   │   └── evaluation/
-│   │       ├── baselines.py            # Implementations of FCFS, Nearest Station, and Simple Priority
-│   │       └── comparator.py           # Standardized benchmark evaluation engine
-│   ├── tests/
-│   │   ├── test_agents.py              # Unit tests for FIPA message dispatching and agent state updates
-│   │   ├── test_search.py              # Unit tests verifying A* optimality and heuristic admissibility
-│   │   ├── test_csp.py                 # Unit tests verifying 0 charger overlaps and 0 transformer breaches
-│   │   ├── test_logic.py               # Unit tests verifying forward chaining deductions and WHY proofs
-│   │   ├── test_game_theory.py         # Unit tests verifying Nash product maximization and Pareto efficiency
-│   │   └── test_simulation.py          # End-to-end integration tests over 100 simulation ticks
-│   ├── requirements.txt                # Python package dependencies (fastapi, uvicorn, pydantic, pytest)
-│   └── run.py                          # Dedicated backend server launcher script
-│
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx                     # Root React application component and view router
-│   │   ├── main.jsx                    # Vite DOM mount entrypoint
-│   │   ├── index.css                   # Global design system, 4-layer inner shadows, zero border-radius
-│   │   ├── api/
-│   │   │   └── client.js               # Axios REST client configured for backend communications
-│   │   └── components/
-│   │       ├── common/
-│   │       │   ├── Header.jsx          # Top navigation bar with system status and emergency indicators
-│   │       │   ├── Sidebar.jsx         # Minimalist navigation menu with active electric-blue gradient
-│   │       │   └── MetricCard.jsx      # Telemetry KPI cards with monospace typography
-│   │       ├── views/
-│   │       │   ├── LiveNetworkDashboard.jsx    # View 1: GIS Map, grid gauges, live station cards
-│   │       │   ├── AgentMonitorView.jsx        # View 2: Multi-agent telemetry and FIPA message broker
-│   │       │   ├── LogicReasoningView.jsx      # View 3: Knowledge Base rules and WHY trace inspector
-│   │       │   ├── SearchComparisonView.jsx    # View 4: Collision-free graph canvas and search metrics
-│   │       │   ├── CSPSchedulerView.jsx        # View 5: Interactive Gantt chart and constraint solver
-│   │       │   ├── NegotiationView.jsx         # View 6: Pareto frontier and Nash bargaining calculator
-│   │       │   ├── ScenariosView.jsx           # View 7: Disturbance simulation test lab
-│   │       │   ├── PEASMatrixView.jsx          # View 8: Tabular benchmark comparison vs baselines
-│   │       │   └── CockpitHUDView.jsx          # View 9: Fullscreen driver infotainment cockpit
-│   ├── package.json                    # Node dependencies (react, lucide-react, leaflet, tailwindcss)
-│   ├── tailwind.config.js              # Custom Tailwind configuration (black/electric blue palette)
-│   └── vite.config.js                  # Vite build tool configuration and dev server proxy
-│
-└── docs/
-    ├── DOCUMENTATION.md                # This complete technical documentation document
-    ├── Documentation.docx              # Formatted Microsoft Word executive report
-    └── convert_doc_to_word.py          # Automated DOCX generation script using python-docx
-```
-
----
-
-## 10. Installation, Setup & Deployment Guide
-
-### 10.1 System Prerequisites
-- **Python**: Version 3.10, 3.11, or 3.12 installed
-- **Node.js**: Version 18.x or 20.x LTS installed
-- **Package Managers**: `pip` (Python), `npm` (Node)
-
-### 10.2 Backend Setup & Execution
-```powershell
-# 1. Open terminal and navigate to backend directory
-cd backend
-
-# 2. (Optional) Create and activate a Python virtual environment
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-
-# 3. Install required Python packages
-pip install -r requirements.txt
-
-# 4. Execute the automated unit test suite (53 tests)
-python -m pytest tests/ -v
-
-# 5. Start the FastAPI backend server
-python run.py
-```
-- The backend API will be live at: `http://localhost:8000`
-- Interactive OpenAPI documentation (Swagger UI): `http://localhost:8000/docs`
-
-### 10.3 Frontend Setup & Execution
-```powershell
-# 1. Open a new terminal and navigate to frontend directory
-cd frontend
-
-# 2. Install Node dependencies
-npm install
-
-# 3. Launch the Vite development server
-npm run dev
-```
-- The web application dashboard will be live at: `http://localhost:5173`
-
-### 10.4 Environment Variables Configuration (`backend/.env`)
-An optional `.env` file can be placed in `backend/` to configure live external API keys:
-```env
-# Optional external provider API keys
-OPENCHARGEMAP_API_KEY=096e87c6-c10d-4e12-9c1a-352366384fe2
-# OpenStreetMap, Nominatim & OSRM require ZERO API keys (100% Free & Open-Source)
-
-# Simulation Configuration Defaults
-SIMULATION_DEFAULT_GRID_LIMIT=300.0
-SIMULATION_DEFAULT_SOLAR_PEAK=120.0
-SIMULATION_SEED=42
-```
-*Note: If external API keys are omitted, the system automatically falls back to its comprehensive local offline dataset of 72 Indian charging stations with zero disruption.*
-
----
-
-## 11. AI Syllabus Mapping (Units I–V) & Viva Guide
-
-### 11.1 How the AI Techniques Work Together
-
-The system divides urban EV resource management into specialized classical AI layers:
+## 4. Architecture
 
 ```text
-EV Charging Request
-        ↓
-[1] Agent Observes Environment  ──→ Sensors read battery SoC, deadlines, grid kW, solar output
-        ↓
-[2] Knowledge Base Logic        ──→ First-Order Logic rules check emergency priority & safety
-        ↓
-[3] A* Search Navigation        ──→ Evaluates road network to recommend optimal station
-        ↓
-[4] CSP Smart Scheduler         ──→ Backtracking + AC-3 + MRV assigns non-overlapping slots & power
-        ↓
-[5] Game Theory Negotiation     ──→ Pareto filtering & Nash Bargaining resolves multi-agent conflicts
-        ↓
-[6] Coordinator Agent Dispatch  ──→ Synthesizes global schedule and dispatches charging instructions
-        ↓
-Safe & Optimized Charging Begins
+backend/app/
+├── core/           PEAS specification; PEAS metrics; 8-step workflow engine; unified pipeline
+├── models/         Pydantic schemas: EV, Charger, Station, Grid, EnergyResource, ChargingSession
+├── problem/        Formal problem formulation <S, s0, A, G, C, c>
+├── simulation/     Seeded discrete-event simulation of the charging network
+├── agents/         Agent layer (base, EV, station, grid, energy, coordinator) + message broker
+├── knowledge/      Fact base, production rules, forward/backward chaining, resolution, DPLL
+├── search/         BFS, DFS, UCS, GBFS, A*, station graph, AND-OR, belief-state, LRTA*
+├── optimization/   Hill climbing, simulated annealing
+├── csp/            Variables, 8 hard constraints, backtracking solver, utility evaluator, scenarios
+├── game_theory/    Nash bargaining, Minimax + alpha-beta, slot competition, utility models
+├── scenarios/      Five injectable events with measured before/after state
+├── evaluation/     Policy benchmark measured from seeded simulation runs
+├── explanation/    Decision registry (explanation records retrievable by decision id)
+└── api/            REST endpoints, mounted under /api
 ```
 
-#### Layer Responsibilities
-- **Agent System**: *"Who makes the decision?"* — Modular EV, Station, Grid, Energy, and Coordinator agents.
-- **Logic**: *"What rules apply?"* — Forward & Backward Chaining verifies emergency preemption and grid limits.
-- **A\* Search**: *"Which route/station is suitable?"* — Finds lowest-cost route balancing distance, wait, and price.
-- **CSP**: *"When and where can the EV charge?"* — Solves temporal slots and power caps without transformer overload.
-- **Game Theory**: *"How should limited resources be shared?"* — Reconciles competing agent goals via Nash Bargaining.
+The **8-step workflow** (`core/workflow.py`) is the main entry point and runs, in order: request
+intake → formal formulation → knowledge reasoning → search → CSP scheduling → conflict resolution →
+final decision → explanation. Each step's output is derived from the live environment; the steps are
+mutually consistent (a test asserts that the station named in step 4 is the station scheduled in step 5
+and reported in step 7).
 
 ---
 
-### 11.2 Comprehensive Syllabus Mapping Table
+## 5. Algorithms
 
-| AI Syllabus Topic | Where Used in Project | Project Component / File | Status | Simple Explanation |
-| :--- | :--- | :--- | :---: | :--- |
-| **Intelligent Agents** | `/agents` page | `backend/app/agents/` | `IMPLEMENTED` | Distinct software agents handle vehicles, chargers, power grids, and coordination. |
-| **Agents & Environments** | Live Network Map & Engine | `backend/app/simulation/engine.py` | `IMPLEMENTED` | Agents perceive environment state (grid load, solar kW) and take rational actions. |
-| **Good Behavior / Rationality** | PEAS matrix & utility scores | `backend/app/core/peas.py` | `IMPLEMENTED` | Selects actions that minimize wait time, eliminate transformer overloads, and maximize solar. |
-| **Nature of Environments** | Dynamic Simulation Engine | `backend/app/simulation/engine.py` | `IMPLEMENTED` | Models a Dynamic, Discrete, Multi-Agent environment with seed-reproducible arrivals. |
-| **Structure of Agents** | BaseAgent & message broker | `backend/app/agents/base_agent.py` | `IMPLEMENTED` | Each agent encapsulates sensors, state, decision logic, and FIPA-ACL communication. |
-| **Problem-Solving Agents** | Search & Scheduler pages | `backend/app/search/problem.py` | `IMPLEMENTED` | Formulates charging goals and plans sequences of actions to reach target battery SoC. |
-| **Uninformed Search (BFS, DFS, UCS)** | `/search` comparison matrix | `backend/app/search/algorithms.py` | `IMPLEMENTED` | Explores network graph without heuristics to benchmark hop counts and path costs. |
-| **Informed Search (A\*, GBFS)** | `/search` station & route finder | `backend/app/search/algorithms.py` | `IMPLEMENTED` | Uses heuristic estimates $h(n)$ to guide route search faster toward the destination. |
-| **A\* Search Algorithm** | Station & Route Navigation | `backend/app/search/algorithms.py` | `IMPLEMENTED` | Evaluates $f(n) = g(n) + h(n)$ to guarantee optimal paths on admissible distance metrics. |
-| **Constraint Satisfaction (CSP)** | `/csp` smart scheduler | `backend/app/csp/solver.py` | `IMPLEMENTED` | Assigns chargers, time slots, and kW rates while satisfying 8 physical and electrical constraints. |
-| **Backtracking Search** | CSP Solver Engine | `backend/app/csp/solver.py` | `IMPLEMENTED` | Recursively tests candidate charging slots and backtracks when conflicts occur. |
-| **MRV & Degree Heuristics** | Variable Ordering in CSP | `backend/app/csp/solver.py` | `IMPLEMENTED` | Picks the most constrained EV first (fewest remaining slots) with degree tie-breaking. |
-| **LCV Heuristic** | Value Ordering in CSP | `backend/app/csp/solver.py` | `IMPLEMENTED` | Prefers the charging slot that leaves the most options available for other waiting EVs. |
-| **Forward Checking** | Constraint Propagation | `backend/app/csp/solver.py` | `IMPLEMENTED` | Prunes conflicting slots from unassigned EVs immediately after each assignment. |
-| **Arc Consistency (AC-3)** | CSP Preprocessing & Filter | `backend/app/csp/solver.py` | `IMPLEMENTED` | Removes impossible slot values across all variable pairs before/during search. |
-| **Game Theory & Utilities** | `/negotiation` energy balancer | `backend/app/game_theory/` | `IMPLEMENTED` | Formulates explicit utility functions $U_i(a) \in [0, 100]$ for competing stakeholders. |
-| **Pareto Optimization** | Negotiation Step 5 | `backend/app/game_theory/negotiation.py` | `IMPLEMENTED` | Filters out dominated alternatives where all agents would be worse off. |
-| **Nash Bargaining Solution** | Negotiation Step 6 | `backend/app/game_theory/negotiation.py` | `IMPLEMENTED` | Maximizes $N(a) = \prod \max(0, U_i - d_i)$ to find a provably fair compromise. |
-| **Knowledge-Based Agents** | `/logic` rules engine | `backend/app/knowledge/kb.py` | `IMPLEMENTED` | Employs an explicit Knowledge Base of facts and rules to govern safe operations. |
-| **First-Order Logic (FOL)** | Fact Base & Rules | `backend/app/knowledge/rule.py` | `IMPLEMENTED` | Represents objects (EVs, chargers), relations, predicates, and parameterized rules. |
-| **Forward Chaining** | Data-driven inference | `backend/app/knowledge/inference_engine.py` | `IMPLEMENTED` | Deduces new facts (e.g. emergency priority) as sensor data arrives until fixpoint. |
-| **Backward Chaining / WHY Trace** | Goal verification queries | `backend/app/knowledge/inference_engine.py` | `IMPLEMENTED` | Proves safety queries backwards from goal to facts, outputting a step-by-step trace. |
-| **Knowledge Engineering** | Safety & Emergency Rules | `backend/app/knowledge/kb.py` | `IMPLEMENTED` | Encodes expert domain knowledge for grid shedding and emergency medical preemption. |
-| **AI Applications** | Full EV & Grid System | Entire Repository | `IMPLEMENTED` | Solves real-world smart-city challenges in renewable energy, grid safety, and EV fleet logistics. |
-| **Local Search (Hill-Climber, SA, GA)** | None | N/A | `NOT IMPLEMENTED` | Project uses deterministic graph search and CSP backtracking, not stochastic local search. |
-| **Continuous Space Search** | None | N/A | `NOT IMPLEMENTED` | Operates on discrete road graph nodes, discrete charger bays, and discrete time slots. |
-| **Online Search in Unknown Mazes** | None | N/A | `NOT IMPLEMENTED` | The road network map and hardware limits are completely known offline prior to dispatch. |
-| **Alpha-Beta / Minimax Search** | None | N/A | `NOT IMPLEMENTED` | Resource allocation is cooperative bargaining, not a two-player zero-sum adversarial game. |
-| **Monte Carlo Tree Search (MCTS)** | None | N/A | `NOT IMPLEMENTED` | Deterministic backtracking and utility optimization are used instead of stochastic tree sampling. |
-| **Propositional Theorem Proving / DPLL**| None | N/A | `NOT IMPLEMENTED` | Deduction is done via FOL production rules, not clausal resolution or DPLL SAT solvers. |
-| **Machine Learning / Deep Learning** | None | N/A | `NOT IMPLEMENTED` | Intentionally avoided to guarantee 100% deterministic safety and complete explainability. |
-| **Generative AI / LLMs** | None | N/A | `NOT IMPLEMENTED` | Excluded to eliminate black-box hallucinations on critical electrical infrastructure. |
+### 5.1 Problem formulation
+The request becomes a formal model: initial state, action set, goal test and step cost `c(s, a, s')`.
+Served by `POST /api/problem/formulate`; implemented in `app/problem/formulation.py`.
+
+### 5.2 Multi-agent layer
+Distinct agents with explicit roles communicate through a message broker using ACL-style performatives
+(`REQUEST`, `INFORM`, `PROPOSE`, `ACCEPT_PROPOSAL`, `REJECT_PROPOSAL`, `CFP`, `FAILURE`). The coordinator
+arbitrates between proposals.
+
+- **EV agent** — battery state, budget, deadline.
+- **Station agent** — charger queues, `OPERATIONAL`/`FAULT` status, power allocation.
+- **Grid agent** — transformer load, overload warnings.
+- **Energy agent** — available generation and storage.
+- **Coordinator agent** — combines proposals into a schedule.
+
+### 5.3 Search
+Uninformed and informed search over the station graph: BFS, DFS, UCS, Greedy Best-First and A* with an
+admissible straight-line heuristic. All five run on the same live problem and are compared on path cost,
+nodes expanded and runtime. A* returns the same cost as UCS on the same instance while expanding fewer
+nodes, which is asserted in the test suite.
+
+Additional search modes: AND-OR graph search (contingency plans for nondeterministic outcomes),
+belief-state search (partial observability) and LRTA* (online search).
+
+### 5.4 Local search
+Hill climbing with random restarts and simulated annealing, exposed through
+`POST /api/optimization/schedule` (`app/optimization/local_search.py`).
+
+### 5.5 Constraint satisfaction
+A backtracking CSP. Variables are (station, charger, start time, duration, power) tuples.
+
+The **eight hard constraints** are: `NoChargerOverlap`, `StationPowerCapacity`, `GridTransformerCapacity`,
+`DepartureDeadline`, `EVMaxPowerLimit`, `ChargerCompatibility`, `EnergyAvailability`, `OperationalStation`.
+
+Heuristics, each individually switchable so its effect can be measured: **MRV** variable ordering with a
+degree tie-break, **LCV** value ordering, **forward checking**, and **AC-3** arc consistency before
+search. Feasible solutions are ranked by a weighted utility over waiting time, travel distance, energy
+cost, grid stress, station utilisation and priority, so the solver returns the best schedule found rather
+than the first one.
+
+Search is **bounded** by a node budget and a wall-clock budget. If the budget is exhausted the solver
+reports the instance as *unknown* rather than claiming it is infeasible.
+
+Measured behaviour on the seven shipped scenarios (`POST /api/csp/solve`):
+
+| Scenario | Feasible | Backtracks | Constraint checks | Domain values | AC-3 pruned | FC prunes |
+| :--- | :---: | ---: | ---: | ---: | ---: | ---: |
+| NORMAL_DEMAND | yes | 0 | 5270 | 48 | 0 | 6 |
+| CHARGER_SHORTAGE | yes | 0 | 5399 | 42 | 0 | 6 |
+| PROPAGATION_INFEASIBLE | **no** | 0 | 142 | 14 | 6 | 0 |
+| TIGHT_WINDOW_BACKTRACKING | yes | 0 | 156 | 9 | 6 | 0 |
+
+Note that AC-3 prunes nothing on the first two scenarios — the constraints are already satisfiable
+without propagation. `PROPAGATION_INFEASIBLE` is the scenario where AC-3 does the work, eliminating all
+values for some variable before search begins.
+
+### 5.6 Game theory
+**Cooperative:** Nash bargaining product `N(a) = Π max(0, U_i(a) − d_i)` with Pareto filtering, over
+explicit utility functions for the competing stakeholders.
+
+**Adversarial:** two-player zero-sum Minimax with alpha-beta pruning for contested charging slots.
+Alpha and beta cut-offs are counted separately and their sum equals the reported total, which is asserted
+in the test suite. This module is a secondary demonstration and does not feed the core charging decision.
+
+### 5.7 Knowledge representation and inference
+A fact base of `(subject, predicate, value)` triples, seven production rules, and four inference
+mechanisms:
+
+- **Forward chaining** — data-driven inference to a fixed point over the live facts.
+- **Backward chaining** — goal-driven proof with an explicit trace, used for priority queries.
+- **Resolution refutation** — premises converted to CNF, resolution applied, empty clause derived to
+  prove a safety theorem.
+- **DPLL** — satisfiability checking with unit propagation and pure symbol elimination.
+
+Facts come from four origins, and every fact records which: user request fields, the simulated
+environment, geometry (distances computed from coordinates), and conclusions derived by the rules
+themselves.
 
 ---
 
-## 12. Academic Honesty & No-ML/No-LLM Verification
+## 6. Data Model, Sources and Provenance
 
-> ### FORMAL DECLARATION OF ARTIFICIAL INTELLIGENCE PARADIGM
-> 
-> The **Intelligent EV Charging & Resource Management System** has been developed exclusively and strictly within the domain of **Classical Artificial Intelligence, Symbolic Logic, Constraint Satisfaction Programming, Graph Search, and Game-Theoretic Multi-Agent Systems**.
-> 
-> The codebase contains:
-> - **NO Machine Learning (ML) Models**: Zero neural network weights, zero PyTorch/TensorFlow dependencies, zero Scikit-Learn regressors or classifiers.
-> - **NO Large Language Models (LLMs)**: Zero OpenAI, Anthropic, Gemini, or local LLM calls; zero generative prompt engineering or non-deterministic completions.
-> 
-> **Every decision made by the platform is governed by explicit mathematical proofs, admissible heuristics ($h(n) \le h^*(n)$), first-order production rules, hard constraint consistency algorithms (AC-3), and Nash Bargaining equilibria. All outcomes are 100% auditable, fully explainable, and deterministically reproducible.**
+Every value in the system belongs to exactly one of four categories, and the API tags them.
+
+| Category | Meaning | Examples |
+| :--- | :--- | :--- |
+| **Static public metadata** | A snapshot of public station records bundled with the repository. No external API is called at runtime. | Station name, operator, address, coordinates, connector types, port count, published tariff |
+| **Simulated data** | Produced by the seeded `SimulationEngine`. | Occupancy, charger status, faults, queue length, transformer load, modelled solar availability, battery levels of non-requesting vehicles |
+| **User input** | Supplied by the requesting user. | State of charge, target charge, deadline, priority, connector requirement, location |
+| **Classical AI computation** | Derived by an algorithm at request time. | Search paths and costs, CSP assignments and constraint checks, fired rules, inferred facts, Nash products, Minimax values |
+
+**Currency.** Dataset tariffs are published in Indian Rupees per kWh. The simulation uses a single
+accounting unit (USD), and the conversion happens once at load time using an explicitly documented fixed
+rate (`custom_station_dataset.py`, 1 USD = 85 INR). This prevents mixing units inside a cost
+calculation.
+
+**Station catalogue.** 22 stations / 76 chargers: three seed hubs defined in the simulation engine, plus
+19 stations from the bundled public-metadata dataset.
+
+**No external services.** The system performs no network calls to map, geocoding, routing or
+charging-POI providers. It runs fully offline.
 
 ---
-*Documentation compiled for academic assessment, operational auditing, and technical review.*  
-*Intelligent EV Charging & Resource Management System — Version 2.5 (Classical AI Architecture)*
 
+## 7. API Reference
+
+All endpoints are mounted under `/api`. Interactive documentation is available at `/docs` when the
+server is running. 56 operations are registered.
+
+| Group | Endpoints | Purpose |
+| :--- | :--- | :--- |
+| Environment | `GET /state`, `GET /health`, `POST /tick`, `POST /reset`, `POST /strategy` | Read and advance the simulation; switch scheduling policy |
+| Requests | `POST /ev/add`, `POST /ev/emergency`, `GET|POST /evs`, `GET|PUT /evs/{id}` | Inject and inspect vehicles |
+| Network | `GET /stations`, `GET /stations/{id}`, `GET /chargers`, `GET /grid`, `GET /resources`, `GET /sessions` | Read the station/charger/grid/resource inventory |
+| Formulation | `POST /problem/formulate` | Build the formal problem model |
+| Search | `POST /search/solve`, `POST /search/compare`, `GET /search/network`, `POST /search/and-or-plan`, `POST /search/belief-state`, `POST /search/lrta-step` | Station selection, algorithm comparison and the extended search modes |
+| CSP | `POST /csp/solve`, `GET /csp/scenarios` | Schedule vehicles under the eight hard constraints |
+| Knowledge | `GET /kb/facts`, `GET /kb/rules`, `POST /kb/forward_chain`, `POST /kb/query/priority`, `POST /kb/query/safe_charging` | Inspect and query the rule base |
+| Logic | `POST /logic/forward-chain`, `POST /logic/backward-chain`, `POST /logic/resolution-prove`, `POST /logic/dpll/solve` | Inference, theorem proving and satisfiability |
+| Agents | `GET /agents`, `POST /agents/decision`, `GET /agents/logs`, `GET /agents/station-master/details` | Multi-agent decisions and message log |
+| Game theory | `POST /negotiation/resolve`, `GET /negotiation/scenarios`, `POST /game/decision`, `POST /game/slot-competition` | Conflict resolution and adversarial slot competition |
+| Scenarios | `GET /scenarios/list`, `POST /scenarios/run` | Run an injectable event |
+| Evaluation | `GET /evaluation/benchmark` | Measure the four scheduling policies |
+| Workflow | `POST /workflow/execute`, `POST /workflow/why-selected`, `POST /pipeline/decide` | The full 8-step chain and its explanation |
+| Explanation | `GET /explanation/{decision_id}`, `GET /explanation` | Retrieve a stored decision and its reasoning |
+| Reference | `GET /peas` | PEAS specification and measured metrics |
+
+Every AI endpoint returns the same envelope: `input`, `algorithm`, `result`, `metrics`, `explanation`.
+Metrics are read from the algorithm's own instrumentation for that run, never from constants.
+
+---
+
+## 8. Frontend
+
+React 18 with Vite and Tailwind, plus a small custom design-system layer (`src/index.css`).
+
+**Design standard:** light theme — near-white background (`#F8FAFC`), white cards, dark navy/slate text,
+blue and teal accents. Flat borders and subtle elevation; no gradients as decoration, no glassmorphism,
+no glow effects, no gauges or cockpit styling. The interface is a decision-support tool, not a vehicle
+dashboard.
+
+**Ten pages** (sidebar navigation):
+
+| # | Page | What it shows |
+| :--- | :--- | :--- |
+| 1 | Dashboard | Environment snapshot, the eight workflow stages, algorithm inventory |
+| 2 | EV Request | Request form; runs the full workflow and shows the per-step result |
+| 3 | Station Search | Network map, station/charger table, reachability |
+| 4 | Search Comparison | All five algorithms side by side: path cost, nodes expanded, runtime, result |
+| 5 | Scheduling (CSP) | Variables, domains, constraint list, solver metrics, schedule timeline |
+| 6 | Knowledge & Logic | Facts, rules, forward/backward chaining traces, resolution and DPLL |
+| 7 | Agent System | Agent roles and actions, message log, PEAS panel from `/api/peas` |
+| 8 | Conflict / Game Decision | Negotiation alternatives, Nash product, game decision |
+| 9 | Decision Explanation | The stored decision trace for a decision id |
+| 10 | Evaluation | Measured policy comparison and the scenario runner |
+
+**API access:** the base URL comes from `VITE_API_BASE_URL` (default `/api`, proxied by the dev
+server). No component hardcodes a host.
+
+**State handling:** every data-driven page implements loading, empty, error and success states. Backend
+errors surface as messages derived from the HTTP response; internal stack traces are never exposed.
+
+---
+
+## 9. Simulation and Injectable Events
+
+The simulation is a seeded discrete-event model: a 450 kW transformer, the station catalogue, and
+vehicles with battery levels, deadlines and priorities. All five scenarios run against a fresh engine
+with an explicit seed and report the measured state before and after.
+
+| Scenario | Event | What is measured |
+| :--- | :--- | :--- |
+| `SCENARIO_1_PEAK_SPIKE` | 15 additional vehicles arrive at tick 0 | Grid load, queue, wait; forward chaining over the live facts; a CSP schedule computed from the post-spike state (the schedule is reported for inspection, not applied to the running simulation) |
+| `SCENARIO_2_STATION_FAILURE` | One station set to `FAULT` | Operational station count; how many vehicles were assigned there and how many were re-assigned by the search-based selector **using the live network** so the failed station is no longer a candidate |
+| `SCENARIO_3_GRID_OVERLOAD` | Transformer rating restricted while running | Measured load before/after; the scenario controller throttles standard-priority sessions to 25 kW and leaves priority sessions untouched |
+| `SCENARIO_4_EMERGENCY_EV` | Emergency vehicle added (5% battery, 30 min deadline) | Which rules actually fired; whether an occupied ultra-fast charger was available to pre-empt |
+| `SCENARIO_5_RENEWABLE_AVAILABILITY` | Modelled solar resource raised | The resource change only. No source-switching or cost re-optimisation is claimed on this path |
+
+Scenario explanations are generated from the measured values. Where an effect is *not* computed, the
+explanation says so rather than describing an outcome the code does not produce.
+
+---
+
+## 10. Evaluation
+
+Four scheduling policies are executed one after another in an identical seeded simulation
+(`GET /api/evaluation/benchmark`, default seed 42, 180 simulated minutes, 12 synthetic vehicles on top of
+the 4 seeded ones):
+
+| Policy | Avg wait (min) | Avg travel (km) | Avg cost ($/EV) | Utilisation (%) | Overloads | Peak load (kW) | Completed | Unit price ($/kWh) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| FCFS | 1.0 | 3.41 | 8.22 | 4.7 | 29 | 1232 | 16/16 | 0.209 |
+| Nearest station | 1.0 | 1.38 | 7.80 | 6.2 | 47 | 782 | 16/16 | 0.199 |
+| Simple priority | 1.0 | 3.34 | 8.24 | 4.7 | 32 | 1192 | 16/16 | 0.209 |
+| **Grid-safe policy** | 19.1 | 1.40 | 7.84 | 7.4 | **0** | **414** | 15/16 | 0.202 |
+
+**How to read this.** The grid-safe policy is the only one that records zero transformer overload
+incidents and it achieves the lowest energy price per kWh, but **it does not dominate the baselines**.
+Its cost is a much longer average wait — it defers and throttles sessions instead of admitting
+everything — and at this horizon one fewer completed vehicle. The baselines' low wait times are a
+consequence of admitting every vehicle immediately and overloading the transformer.
+
+**Scope.** This table compares *scheduling policies* executed inside the simulation. The search, CSP,
+logic and game-theory modules are demonstrated and measured on their own pages; they are not what
+produces this table, and the benchmark documentation says so.
+
+**Reproducibility.** Policy runs are deterministic for a fixed seed, so the same seed reproduces the
+table. Measurements are taken from the running simulation: waiting time per vehicle from the simulation
+clock, cost from billed energy, travel distance recorded at assignment time, utilisation sampled every
+simulated minute, overload incidents from the grid model.
+
+Two measurement details worth recording, because both were previously wrong:
+
+- Travel distance is captured **at assignment time**. A completed session clears the vehicle's assigned
+  station, so a post-run measurement could not recover how far the vehicle drove and silently reported
+  zero for the baselines.
+- Waiting time is measured per vehicle by the simulation clock. All synthetic vehicles arrive at tick 0,
+  so policies that admit on arrival record ~1 minute; the grid-safe policy's deferrals are what produce
+  its longer wait.
+
+---
+
+## 11. Setup and Deployment
+
+**Prerequisites:** Python 3.10+, Node.js 18+.
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m pytest tests/ -v       # 124 tests
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Serves on `http://localhost:8000`; API documentation at `http://localhost:8000/docs`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev                      # http://localhost:5173
+npm run build                    # production bundle in dist/
+```
+
+### Configuration
+
+| Variable | Where | Default | Effect |
+| :--- | :--- | :--- | :--- |
+| `VITE_API_BASE_URL` | `frontend/.env` | `/api` | API base URL used by the client |
+| `SIMULATION_SEED` | `backend/.env` | `42` | Default seed for the simulation |
+
+No API keys are required. The application makes no outbound network calls: the station catalogue is
+bundled with the repository. See `backend/.env.example` and `frontend/.env.example`.
+
+---
+
+## 12. Testing and Verification
+
+**124 automated tests**, run with `python -m pytest tests/`.
+
+Coverage of the main claims:
+
+| Area | What is asserted |
+| :--- | :--- |
+| Search soundness | A* returns the same cost as UCS on the same instance while expanding fewer nodes; DFS finds solutions that exist (the state key includes battery and time) |
+| CSP | Instrumentation is populated from real runs; `enable_lcv` genuinely changes behaviour; the bounded search reports "unknown" rather than "infeasible" when the budget runs out |
+| Workflow | Steps 3–8 agree with each other; faulting the selected station changes the decision; an impossible request scores zero instead of being dressed up |
+| Knowledge base | Forward chaining fires rules on live facts; backward chaining returns a proof trace |
+| Game theory | Alpha plus beta cut-offs equals the reported total |
+| Evaluation | Metrics are measured, not constant; policies behave differently from one another |
+| Scenarios | Before/after snapshots are populated; the failed station is never in a reroute target |
+| Data integrity | Dataset tariffs are converted once from INR to the accounting unit |
+| API surface | Alias paths return the same payload as their canonical route; removed routes are gone |
+
+---
+
+## 13. Limitations and Scope
+
+1. **Simulated dynamic state.** Occupancy, faults, queue state and battery levels are generated by a
+   seeded simulation. Only the station metadata is real-world data, and it is a static snapshot.
+2. **Static graph weights.** Road edges carry fixed distance and time costs; live traffic is not modelled.
+3. **Policy benchmark scope.** The evaluation table measures scheduling policies inside the simulation, not
+   the search/CSP/logic modules.
+4. **Bounded CSP search.** Very large infeasible instances exhaust the search budget and are reported as
+   unknown rather than solved to a conclusion.
+5. **No vehicle-to-grid.** Discharging is out of scope; the power domain is charging only.
+6. **Single-node server.** The explanation registry is in-memory; decisions do not survive a restart.
+
+**No machine learning.** The system contains no machine learning, deep learning, neural networks, LLM or
+generative AI, and does not depend on PyTorch, TensorFlow, scikit-learn or any model-serving API. Every
+decision comes from an algorithm whose steps can be printed and re-executed: search expands named nodes,
+the CSP reports its assignment and constraint checks, the rule engine reports which rules fired, and the
+game-theory modules report the utilities and the chosen alternative. Nothing is inferred from training
+data, and no output is generated by a language model.
+
+---
+
+## 14. Glossary
+
+| Term | Meaning |
+| :--- | :--- |
+| **AC-3** | Arc consistency algorithm 3; removes domain values with no support in a neighbouring variable's domain |
+| **Admissible heuristic** | A heuristic that never overestimates the true cost to the goal; required for A* optimality |
+| **CSP** | Constraint satisfaction problem — variables, domains and constraints |
+| **Decision id** | Identifier under which a decision and its reasoning trace are stored |
+| **Forward checking** | Pruning values from unassigned variables' domains immediately after each assignment |
+| **GBFS** | Greedy Best-First Search — expands the node that looks closest to the goal |
+| **LCV** | Least Constraining Value — value ordering that rules out the fewest options for other variables |
+| **MRV** | Minimum Remaining Values — variable ordering that picks the most constrained variable first |
+| **Nash product** | Product of the agents' gains over their disagreement points; the alternative maximising it is selected |
+| **PEAS** | Performance measure, Environment, Actuators, Sensors — a way of specifying an agent |
+| **Transformer headroom** | Difference between the modelled load and the transformer rating |
+| **UCS** | Uniform Cost Search — expands the lowest path-cost node; optimal for non-negative costs |
+
+---
+
+*Intelligent EV Charging & Resource Management System — Technical Documentation*

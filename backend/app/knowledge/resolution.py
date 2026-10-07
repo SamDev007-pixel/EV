@@ -1,7 +1,6 @@
 """
 Propositional Resolution Refutation Theorem Prover.
-FOAI Unit IV: Knowledge-Based Agents, Propositional Logic, and Resolution.
-Russell & Norvig, Artificial Intelligence: A Modern Approach (Chapter 7.5).
+Propositional resolution refutation over the charging knowledge base.
 
 Resolution is a complete inference rule for propositional logic.
 To prove KB |= alpha:

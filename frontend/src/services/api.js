@@ -128,7 +128,7 @@ export async function toggleStationFault(stationId, isFaulty = true) {
 }
 
 // =============================================================================
-// 2. UNIT I: FORMAL PROBLEM FORMULATION API
+// 2. PROBLEM FORMULATION API
 // =============================================================================
 
 export async function formulateProblem(payload) {
@@ -145,7 +145,7 @@ export async function formulateProblem(payload) {
 }
 
 // =============================================================================
-// 3. UNIT II: SEARCH & ROUTING ALGORITHM APIS
+// 3. SEARCH & ROUTING ALGORITHM APIS
 // =============================================================================
 
 export async function fetchSearchNetwork() {
@@ -184,7 +184,7 @@ export async function recommendStation(scenario) {
 }
 
 // =============================================================================
-// 4. UNIT III: CONSTRAINT SATISFACTION (CSP) SCHEDULING APIS
+// 4. CONSTRAINT SATISFACTION (CSP) SCHEDULING APIS
 // =============================================================================
 
 export async function fetchCSPScenarios() {
@@ -210,7 +210,7 @@ export async function solveCSPSchedule(config) {
 }
 
 // =============================================================================
-// 5. UNIT III: GAME THEORY & CONFLICT RESOLUTION APIS
+// 5. GAME THEORY & CONFLICT RESOLUTION APIS
 // =============================================================================
 
 export async function fetchNegotiationScenarios() {
@@ -249,8 +249,17 @@ export async function runMinimaxCompetition(maxRounds = 2) {
 }
 
 // =============================================================================
-// 6. UNIT IV: KNOWLEDGE BASE & LOGICAL INFERENCE APIS
+// 6. KNOWLEDGE BASE & LOGICAL INFERENCE APIS
 // =============================================================================
+
+export async function fetchPEAS() {
+  try {
+    const res = await fetch(`${BASE_URL}/peas`);
+    return await handleResponse(res, 'PEAS specification unavailable.');
+  } catch (err) {
+    throw new Error(err.message || 'PEAS specification unavailable.');
+  }
+}
 
 export async function fetchFacts() {
   try {
@@ -334,7 +343,7 @@ export async function runPropositionalDPLL(clauses = null) {
 }
 
 // =============================================================================
-// 7. UNIT I: MULTI-AGENT ACTIONS & DELIBERATION
+// 7. MULTI-AGENT ACTIONS & DELIBERATION
 // =============================================================================
 
 export async function runAgentDecision(decisionRequest) {
@@ -351,7 +360,7 @@ export async function runAgentDecision(decisionRequest) {
 }
 
 // =============================================================================
-// 8. UNIT V: FLEET BENCHMARKING & EVALUATION
+// 8. FLEET BENCHMARKING & EVALUATION
 // =============================================================================
 
 export async function fetchBenchmarkResults(seed = 42) {

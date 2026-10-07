@@ -1,19 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Car,
   Zap,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
-  Cpu,
-  ArrowRight,
-  GitCompare,
   Calendar,
-  Brain,
-  Scale,
+  AlertTriangle,
+  ArrowRight,
+  Play,
+  RotateCcw,
   Sparkles,
-  RefreshCw
+  GitCompare,
+  Battery,
+  Grid3x3
 } from 'lucide-react';
+import { PageHeader, Section, StatTile, StateBlock } from '../common';
+import { listRecentExplanations } from '../../services/api';
+
+const SEVERITY_BADGE = {
+  CRITICAL: 'badge-rose',
+  HIGH: 'badge-amber',
+  MEDIUM: 'badge-blue',
+  LOW: 'badge-slate'
+};
+
+function badgeForPriority(value) {
+  const key = String(value || '').toUpperCase();
+  return SEVERITY_BADGE[key] || 'badge-slate';
+}
+
+/**
+ * The explanation registry stores the selected decision as a free-form object. Only its scalar
+ * entries are shown; nested structures are summarised by size so no raw JSON reaches the table.
+ */
+function summariseDecision(decision) {
+  if (!decision || typeof decision !== 'object') return '—';
+  const preferred = ['decision', 'selected_station_id', 'station_id', 'charger_id', 'algorithm', 'action', 'is_feasible'];
+  const entries = Object.entries(decision).filter(([, v]) => v !== null && v !== undefined);
+  if (entries.length === 0) return '—';
+  return [
+    ...entries.filter(([k]) => preferred.includes(k)),
+    ...entries.filter(([k]) => !preferred.includes(k)),
+  ]
+    .slice(0, 3)
+    .map(([k, v]) => {
+      if (typeof v === 'object') {
+        return `${k}: ${Array.isArray(v) ? `${v.length} item(s)` : `${Object.keys(v).length} field(s)`}`;
+      }
+      if (typeof v === 'number') return `${k}: ${Number.isInteger(v) ? v : v.toFixed(2)}`;
+      return `${k}: ${String(v).slice(0, 40)}`;
+    })
+    .join(' · ');
+}
 
 export default function DashboardView({
   simState,
@@ -21,308 +57,493 @@ export default function DashboardView({
   onStepSimulation,
   onResetSimulation
 }) {
+  const [decisions, setDecisions] = useState([]);
+  const [decisionsState, setDecisionsState] = useState('loading');
+  const [decisionsError, setDecisionsError] = useState(null);
+  const [busy, setBusy] = useState(null);
+
   const evs = simState?.evs || [];
   const stations = simState?.stations || [];
-  const gridNode = simState?.grid_node || { currentLoad: 140, capacity: 400 };
+  const sessions = simState?.sessions || [];
+  const resources = simState?.energy_resources || [];
+  const metrics = simState?.peas_metrics || {};
+  const grid = simState?.grid_node;
 
-  // Calculate high-level metrics
-  const activeEVRequests = evs.filter(e => e.status !== 'CHARGED');
-  const chargingEVs = evs.filter(e => e.status === 'CHARGING');
-  const waitingEVs = evs.filter(e => e.status === 'WAITING' || e.status === 'EN_ROUTE');
-  const availableStations = stations.filter(s => s.status === 'AVAILABLE' || s.status === 'OPERATIONAL');
-  const faultStations = stations.filter(s => s.status === 'FAULT' || s.is_operational === false);
-  const totalBays = stations.reduce((acc, s) => acc + (s.total_bays || s.chargers?.length || 2), 0);
-  const occupiedBays = stations.reduce((acc, s) => acc + (s.occupied_bays || 0), 0);
-  const freeBays = Math.max(0, totalBays - occupiedBays);
+  // Vehicle statuses are QUEUED / CHARGING / COMPLETED / TIMED_OUT / CANCELLED.
+  const chargingEVs = evs.filter((e) => e.status === 'CHARGING');
+  const waitingEVs = evs.filter((e) => e.status === 'QUEUED');
+  const completedEVs = evs.filter((e) => e.status === 'COMPLETED');
+  const activeEVs = evs.filter((e) => e.status === 'QUEUED' || e.status === 'CHARGING');
+  const availableStations = stations.filter((s) => s.operating_status === 'OPERATIONAL');
+  const faultStations = stations.filter((s) => s.operating_status === 'FAULT');
+  // Bay counts are derived from the charger records, which is the same source the
+  // scheduler reads. The API does not report a separate bay-total field.
+  const allChargers = stations.flatMap((s) => s.chargers || []);
+  const totalBays = allChargers.length;
+  const freeBays = allChargers.filter((c) => c.current_status === 'AVAILABLE').length;
 
-  // Derive pending conflicts or contention
-  const currentConflicts = waitingEVs.length > freeBays ? waitingEVs.length - freeBays : 0;
-
-  // Recent AI decisions
-  const recentDecisions = [
-    {
-      evId: 'EV-07',
-      priority: 'CRITICAL',
-      assignedStation: 'CS-02 (Central Metro)',
-      algorithm: 'A* Search + CSP',
-      timeSlot: '08:30 - 09:15',
-      status: 'SCHEDULED',
-      reason: 'Rule-Critical-Battery triggered priority bump; shortest travel + zero bay conflict.'
-    },
-    {
-      evId: 'EV-03',
-      priority: 'STANDARD',
-      assignedStation: 'CS-01 (Tech Park Hub)',
-      algorithm: 'Uniform Cost Search (UCS)',
-      timeSlot: '09:00 - 09:45',
-      status: 'CHARGING',
-      reason: 'Optimal cost path selected; transformer headroom verified at 180kW.'
-    },
-    {
-      evId: 'EV-09',
-      priority: 'EMERGENCY',
-      assignedStation: 'CS-02 (Central Metro)',
-      algorithm: 'Game Theory (Nash Bargaining)',
-      timeSlot: '08:15 - 08:50',
-      status: 'COMPLETED',
-      reason: 'Pareto-optimal concession reached with EV-04; emergency preemption granted.'
-    },
-    {
-      evId: 'EV-05',
-      priority: 'STANDARD',
-      assignedStation: 'CS-04 (Airport Expressway)',
-      algorithm: 'A* Search (Euclidean)',
-      timeSlot: '09:30 - 10:15',
-      status: 'EN_ROUTE',
-      reason: 'Admissible heuristic pruned 14 network branches; arrival in 12 min.'
+  const loadDecisions = useCallback(async () => {
+    try {
+      const records = await listRecentExplanations(6);
+      setDecisions(Array.isArray(records) ? records : []);
+      setDecisionsState('ready');
+      setDecisionsError(null);
+    } catch (err) {
+      setDecisions([]);
+      setDecisionsState('error');
+      setDecisionsError(err.message);
     }
-  ];
+  }, []);
 
-  const algorithmActivity = [
-    { name: 'A* Search', module: 'app.search.algorithms', calls: 38, optimality: '100% Admissible', type: 'Heuristic Search' },
-    { name: 'CSP Backtracking (MRV + LCV)', module: 'app.csp.solver', calls: 24, optimality: 'Zero Overlaps', type: 'Constraint Satisfaction' },
-    { name: 'Nash Bargaining Solution', module: 'app.game_theory.negotiation', calls: 11, optimality: 'Pareto Efficient', type: 'Game Theory' },
-    { name: 'First-Order Logic Inference', module: 'app.knowledge.kb', calls: 52, optimality: 'Sound Horn Clauses', type: 'Knowledge Base' },
-    { name: 'DPLL Propositional SAT', module: 'app.logic.propositional_dpll', calls: 16, optimality: 'Exact Model', type: 'SAT Solver' }
-  ];
+  useEffect(() => {
+    loadDecisions();
+  }, [loadDecisions]);
+
+  const runAction = async (name, fn) => {
+    setBusy(name);
+    try {
+      await fn();
+      await loadDecisions();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const gridLoad = grid?.current_load ?? grid?.currentLoad;
+  const gridCap = grid?.maximum_capacity ?? grid?.maximumCapacity;
+  const gridPct =
+    typeof gridLoad === 'number' && typeof gridCap === 'number' && gridCap > 0
+      ? Math.round((gridLoad / gridCap) * 100)
+      : null;
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Banner: Academic Title & Quick Actions */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/50 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">EXECUTIVE AI DASHBOARD</span>
-              <span className="text-xs text-slate-500 font-mono">FOAI UNIT I - V INTEGRATION</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Autonomous EV Charging Decision-Support System
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Symbol-driven classical artificial intelligence solving EV route selection, resource scheduling, 
-              bay conflict resolution, and explainable dispatch without black-box machine learning models.
-            </p>
-          </div>
+    <div className="page">
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+      <PageHeader
+        eyebrow="Executive overview"
+        title="Autonomous EV charging decision support"
+        description="Live view of the fleet, the charging network and the classical AI decision pipeline: heuristic search, constraint satisfaction, logical inference and game-theoretic conflict resolution. No machine learning is used anywhere in this system."
+        actions={
+          <>
             <button
+              type="button"
               onClick={() => onSelectTab('ev_request')}
-              className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
+              className="btn-primary"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Submit EV Request</span>
+              <Sparkles className="h-4 w-4" />
+              Submit EV request
             </button>
             <button
+              type="button"
               onClick={() => onSelectTab('explanation')}
-              className="btn-secondary text-xs flex items-center gap-1.5"
+              className="btn-secondary"
             >
-              <span>Explain Latest Decision</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Explain latest decision
+              <ArrowRight className="h-4 w-4" />
             </button>
-          </div>
-        </div>
+          </>
+        }
+      />
+
+      {/* Fleet + network metrics */}
+      <div className="stat-grid">
+        <StatTile
+          label="Active EV requests"
+          value={activeEVs.length}
+          unit="vehicles"
+          hint={`${chargingEVs.length} charging · ${waitingEVs.length} queued · ${completedEVs.length} completed`}
+        />
+        <StatTile
+          label="Stations available"
+          value={`${availableStations.length}/${stations.length}`}
+          tone="success"
+          hint={`${freeBays} of ${totalBays} charging bays free`}
+        />
+        <StatTile
+          label="Sessions scheduled"
+          value={sessions.length}
+          hint={
+            sessions.length === 0
+              ? 'No charging session created yet'
+              : 'Assignments produced by the search + CSP pipeline'
+          }
+        />
+        <StatTile
+          label="Faulted stations"
+          value={faultStations.length}
+          tone={faultStations.length > 0 ? 'danger' : 'muted'}
+          hint={
+            faultStations.length > 0
+              ? 'Rerouting is applied to these stations'
+              : 'All stations reported operational'
+          }
+        />
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Metric 1: Active EV Requests */}
-        <div className="ai-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Active EV Requests
-            </span>
-            <div className="w-8 h-8 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Car className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 font-mono">{activeEVRequests.length}</span>
-            <span className="text-xs text-slate-500">vehicles</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-            <span>Charging: <strong className="text-emerald-600">{chargingEVs.length}</strong></span>
-            <span>En Route / Waiting: <strong className="text-blue-600">{waitingEVs.length}</strong></span>
-          </div>
-        </div>
+      {/* Grid + resource position */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
-        {/* Metric 2: Available Stations */}
-        <div className="ai-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Available Stations
-            </span>
-            <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Zap className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 font-mono">
-              {availableStations.length} / {stations.length}
-            </span>
-            <span className="text-xs text-emerald-600 font-semibold">Active Hubs</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-            <span>Free Bays: <strong className="text-slate-900">{freeBays}</strong></span>
-            <span>Faulted: <strong className={faultStations.length > 0 ? "text-rose-600" : "text-slate-500"}>{faultStations.length}</strong></span>
-          </div>
-        </div>
-
-        {/* Metric 3: Pending Scheduling Requests */}
-        <div className="ai-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pending Scheduling
-            </span>
-            <div className="w-8 h-8 rounded-md bg-sky-50 text-sky-600 flex items-center justify-center">
-              <Calendar className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 font-mono">{waitingEVs.length}</span>
-            <span className="text-xs text-sky-600 font-medium">CSP Queued</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-            <span>MRV Heuristic: <strong className="text-slate-800">Active</strong></span>
-            <span>AC-3 Filter: <strong className="text-slate-800">Enforced</strong></span>
-          </div>
-        </div>
-
-        {/* Metric 4: Current Conflicts */}
-        <div className="ai-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Detected Conflicts
-            </span>
-            <div className={`w-8 h-8 rounded-md flex items-center justify-center ${
-              currentConflicts > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-400'
-            }`}>
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900 font-mono">{currentConflicts}</span>
-            <span className="text-xs text-slate-500">contested slots</span>
-          </div>
-          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-            <span>Arbitration: <strong className="text-slate-800">Nash Bargaining</strong></span>
-            <span>Safety: <strong className="text-emerald-600">Strict Bound</strong></span>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Main Two-Column Grid: Recent AI Decisions & Algorithm Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column (2 Cols): Recent AI Decisions Table */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="ai-card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Recent AI Decisions</h3>
-                <p className="text-xs text-slate-500">
-                  Real-time algorithmic dispatch allocations with formal reasoning rationale
-                </p>
+        <Section
+          title="Grid transformer"
+          description="Live load reported by the simulated grid node."
+          className="lg:col-span-1"
+        >
+          {grid ? (
+            <div className="space-y-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums text-slate-900">
+                  {typeof gridLoad === 'number' ? gridLoad.toFixed(1) : 'n/a'}
+                </span>
+                <span className="text-sm font-semibold text-slate-500">
+                  / {typeof gridCap === 'number' ? gridCap.toFixed(0) : 'n/a'} kW
+                </span>
               </div>
-              <button
-                onClick={() => onSelectTab('explanation')}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer"
-              >
-                <span>View Full Decision Trace</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
 
+              {gridPct !== null && (
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-2xs text-slate-500">
+                    <span>Utilisation</span>
+                    <span className="font-mono font-semibold text-slate-700">{gridPct}%</span>
+                  </div>
+                  <div className="bar">
+                    <div
+                      className={`bar__fill ${
+                        gridPct >= 90
+                          ? 'bg-rose-500'
+                          : gridPct >= 70
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, gridPct)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-xs">
+                <span className="text-slate-500">Node status</span>
+                <span className={grid.status === 'STABLE' ? 'badge-emerald' : 'badge-amber'}>
+                  {grid.status || 'UNKNOWN'}
+                </span>
+              </div>
+              {metrics.grid_overload_incidents !== undefined && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-500">Overload incidents</span>
+                  <span className="font-mono font-semibold text-slate-900">
+                    {metrics.grid_overload_incidents}
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <StateBlock
+              variant="info"
+              title="Grid state unavailable"
+              detail="The simulation state could not be loaded from the backend."
+            />
+          )}
+        </Section>
+
+        <Section
+          title="Energy resources"
+          description="Availability and tariff of every supplied energy source."
+          className="lg:col-span-2"
+        >
+          {resources.length === 0 ? (
+            <StateBlock
+              variant="empty"
+              title="No energy resources reported"
+              detail="Start the backend and step the simulation to populate this table."
+            />
+          ) : (
             <div className="ai-table-container">
               <table className="ai-table">
                 <thead>
                   <tr>
-                    <th>Vehicle</th>
-                    <th>Priority</th>
-                    <th>Station Assigned</th>
-                    <th>Algorithm</th>
-                    <th>Time Slot</th>
+                    <th>Resource</th>
+                    <th>Type</th>
+                    <th className="num">Available power</th>
+                    <th className="num">Cost</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentDecisions.map((dec, i) => (
-                    <tr key={i}>
-                      <td className="font-semibold text-slate-900 font-mono">{dec.evId}</td>
-                      <td>
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
-                          dec.priority === 'CRITICAL' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-                          dec.priority === 'EMERGENCY' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                          'bg-slate-100 text-slate-700 border border-slate-200'
-                        }`}>
-                          {dec.priority}
-                        </span>
+                  {resources.map((r) => (
+                    <tr key={r.id}>
+                      <td className="col-code">{r.id}</td>
+                      <td>{r.type}</td>
+                      <td className="num">
+                        {typeof r.available_power === 'number' ? `${r.available_power.toFixed(1)} kW` : '—'}
                       </td>
-                      <td className="text-slate-800">{dec.assignedStation}</td>
-                      <td className="font-mono text-xs text-blue-600">{dec.algorithm}</td>
-                      <td className="font-mono text-xs text-slate-600">{dec.timeSlot}</td>
+                      <td className="num">
+                        {typeof r.cost === 'number' ? `$${r.cost.toFixed(3)}/kWh` : '—'}
+                      </td>
                       <td>
-                        <span className="badge-emerald">{dec.status}</span>
+                        <span
+                          className={
+                            r.availability_status === 'AVAILABLE'
+                              ? 'badge-emerald'
+                              : r.availability_status === 'LIMITED'
+                                ? 'badge-amber'
+                                : 'badge-slate'
+                          }
+                        >
+                          {r.availability_status}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            {/* Decision Logic Annotation */}
-            <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-md text-xs text-slate-600 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-slate-800">Mathematical Optimality Guarantee:</strong> All station recommendations are produced by 
-                evaluating the admissible Euclidean heuristic ($h(n) \le h^*(n)$) within A* search and solving the constraint satisfaction 
-                problem with AC-3 arc consistency.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column (1 Col): Algorithm Activity & Foundations */}
-        <div className="space-y-4">
-          <div className="ai-card p-5">
-            <h3 className="text-sm font-bold text-slate-900 mb-1">Active Algorithm Stack</h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Foundations of Artificial Intelligence implementation status
-            </p>
-
-            <div className="space-y-3">
-              {algorithmActivity.map((alg, i) => (
-                <div key={i} className="p-3 border border-slate-200 rounded-md bg-white hover:border-blue-200 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">{alg.name}</span>
-                    <span className="text-[10px] font-mono font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                      {alg.type}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                    <span className="truncate max-w-[140px]">{alg.module}</span>
-                    <span className="text-emerald-700 font-sans font-medium">{alg.optimality}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-200">
-              <button
-                onClick={() => onSelectTab('syllabus')}
-                className="w-full btn-secondary text-xs flex items-center justify-center gap-1.5"
-              >
-                <span>View Complete FOAI Syllabus Mapping</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
+          )}
+        </Section>
 
       </div>
+
+      {/* Recent recorded decisions - read from the backend explanation registry */}
+      <Section
+        title="Recent decisions recorded by the engine"
+        description="Every entry below was written by a real backend run. Nothing on this page is precomputed or hardcoded."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => runAction('step', onStepSimulation)}
+              disabled={busy !== null}
+              className="btn-secondary btn-sm"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {busy === 'step' ? 'Stepping…' : 'Step simulation'}
+            </button>
+            <button
+              type="button"
+              onClick={() => runAction('reset', onResetSimulation)}
+              disabled={busy !== null}
+              className="btn-secondary btn-sm"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              {busy === 'reset' ? 'Resetting…' : 'Reset'}
+            </button>
+          </>
+        }
+      >
+        {decisionsState === 'loading' ? (
+          <StateBlock variant="loading" title="Loading decision records" />
+        ) : decisionsState === 'error' ? (
+          <StateBlock
+            variant="error"
+            title="Decision registry unavailable"
+            detail={decisionsError}
+            action={
+              <button type="button" onClick={loadDecisions} className="btn-secondary btn-sm">
+                Retry
+              </button>
+            }
+          />
+        ) : decisions.length === 0 ? (
+          <StateBlock
+            variant="empty"
+            title="No decision has been recorded yet"
+            detail="Run a request from the EV Request page, or solve a CSP / search scenario, and the resulting decision will appear here."
+            action={
+              <button
+                type="button"
+                onClick={() => onSelectTab('ev_request')}
+                className="btn-primary btn-sm"
+              >
+                Open EV request
+              </button>
+            }
+          />
+        ) : (
+          <div className="ai-table-container">
+            <table className="ai-table">
+              <thead>
+                <tr>
+                  <th>Decision ID</th>
+                  <th>Topic</th>
+                  <th>Algorithm</th>
+                  <th>Selected decision</th>
+                  <th>Recorded at</th>
+                </tr>
+              </thead>
+              <tbody>
+                {decisions.map((d) => (
+                  <tr key={d.decision_id}>
+                    <td className="col-code">{d.decision_id}</td>
+                    <td>
+                      <span className="badge-blue">{d.topic}</span>
+                    </td>
+                    <td className="font-medium text-slate-700">{d.algorithm_used}</td>
+                    <td className="text-slate-600">{summariseDecision(d.selected_decision)}</td>
+                    <td className="col-code">
+                      {d.timestamp ? new Date(d.timestamp).toLocaleTimeString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Section>
+
+      {/* Guided next steps through the pipeline */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+        <Section
+          title="Fleet snapshot"
+          description="Current status of every vehicle the engine is tracking."
+        >
+          {evs.length === 0 ? (
+            <StateBlock
+              variant="empty"
+              title="No vehicles in the network"
+              detail="Submit a request from the EV Request page to add a vehicle."
+            />
+          ) : (
+            <div className="ai-table-container">
+              <table className="ai-table">
+                <thead>
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th className="num">Battery</th>
+                    <th>Assigned station</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evs.map((ev) => (
+                    <tr key={ev.id}>
+                      <td className="col-code">{ev.id}</td>
+                      <td>
+                        <span className={badgeForPriority(ev.priority)}>{ev.priority}</span>
+                      </td>
+                      <td>{ev.status}</td>
+                      <td className="num">
+                        {ev.current_battery_level !== undefined
+                          ? `${Number(ev.current_battery_level).toFixed(0)}%`
+                          : '—'}
+                      </td>
+                      <td className="col-code">{ev.assigned_station_id || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="Where to continue"
+          description="The workflow runs left to right; each page shows one stage of the reasoning."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[
+              {
+                id: 'station_search',
+                icon: Zap,
+                title: 'Station search',
+                text: 'Compare BFS, DFS, UCS, greedy and A* over the charging network.'
+              },
+              {
+                id: 'search_comparison',
+                icon: GitCompare,
+                title: 'Search comparison',
+                text: 'See path cost, nodes expanded, runtime and the chosen route per algorithm.'
+              },
+              {
+                id: 'scheduling',
+                icon: Calendar,
+                title: 'CSP scheduling',
+                text: 'Assign vehicles to chargers and time slots under hard constraints.'
+              },
+              {
+                id: 'conflict_decision',
+                icon: AlertTriangle,
+                title: 'Conflict decision',
+                text: 'Resolve competition for the same slot using a game-theoretic rule.'
+              },
+              {
+                id: 'knowledge_logic',
+                icon: Battery,
+                title: 'Knowledge & logic',
+                text: 'Inspect the fact base and follow forward/backward inference chains.'
+              },
+              {
+                id: 'evaluation',
+                icon: Grid3x3,
+                title: 'Evaluation',
+                text: 'Measured results of four dispatch policies over a seeded fleet run.'
+              }
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onSelectTab(item.id)}
+                  className="group flex items-start gap-3 rounded-md border border-slate-200 bg-white p-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50"
+                >
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-semibold text-slate-900">{item.title}</span>
+                    <span className="mt-0.5 block text-2xs leading-relaxed text-slate-500">
+                      {item.text}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+      </div>
+
+      {/* Measured headline results */}
+      {(metrics.total_evs_processed > 0 || metrics.total_energy_delivered_kwh > 0) && (
+        <Section
+          title="Cumulative run metrics"
+          description="Counters maintained by the simulation engine for the current run."
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <StatTile
+              label="EVs processed"
+              value={metrics.total_evs_processed ?? 0}
+              size="sm"
+            />
+            <StatTile label="Completed" value={metrics.completed_evs ?? 0} size="sm" tone="success" />
+            <StatTile
+              label="Timed out"
+              value={metrics.timed_out_evs ?? 0}
+              size="sm"
+              tone={metrics.timed_out_evs > 0 ? 'danger' : 'muted'}
+            />
+            <StatTile
+              label="Average wait"
+              value={Number(metrics.average_wait_time_min ?? 0).toFixed(1)}
+              unit="min"
+              size="sm"
+            />
+            <StatTile
+              label="Energy delivered"
+              value={Number(metrics.total_energy_delivered_kwh ?? 0).toFixed(1)}
+              unit="kWh"
+              size="sm"
+              tone="primary"
+            />
+            <StatTile
+              label="Grid overloads"
+              value={metrics.grid_overload_incidents ?? 0}
+              size="sm"
+              tone={metrics.grid_overload_incidents > 0 ? 'danger' : 'muted'}
+            />
+          </div>
+        </Section>
+      )}
 
     </div>
   );

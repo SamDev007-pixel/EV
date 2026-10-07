@@ -102,6 +102,77 @@ def get_preset_csp_scenario(scenario_name: str = "NORMAL_DEMAND") -> CSPProblemS
             "EV-D2": CSPEVVariable(ev_id="EV-D2", priority="STANDARD", arrival_time=0, departure_deadline=30, required_battery=40.0, current_battery=10.0, charger_type_needed="ULTRA_FAST"),
         }
 
+    elif scenario_name == "TIGHT_WINDOW_BACKTRACKING":
+        # Single 50 kW charger shared by three EVs with staggered departure deadlines.
+        # The EV with the widest time window is declared first, so a naive depth-first
+        # assignment consumes the only early slot and must be undone (real backtracking).
+        # With MRV + LCV + forward checking enabled the solver reaches the solution
+        # without any dead end - a directly measurable demonstration of the heuristics.
+        stations = {
+            "CS-METRO": {
+                "id": "CS-METRO",
+                "name": "Tata Power - MG Road Central Metro EV Hub",
+                "chargingPower": 250.0,
+                "energyPrice": 0.28,
+                "operatingStatus": "OPERATIONAL",
+                "location": {"x": 5.0, "y": 5.0},
+                "chargers": ["CS-METRO-CH-1"]
+            }
+        }
+        chargers = {
+            "CS-METRO-CH-1": {"id": "CS-METRO-CH-1", "stationId": "CS-METRO", "chargerType": "DC_FAST",
+                              "maximumPower": 50.0, "currentStatus": "AVAILABLE"},
+        }
+        evs = {
+            "EV-201": CSPEVVariable(ev_id="EV-201", priority="STANDARD", battery_capacity=60.0,
+                                    current_battery=5.0, required_battery=35.0, charging_rate=50.0,
+                                    arrival_time=0, departure_deadline=60,
+                                    location={"x": 5.2, "y": 5.1}, charger_type_needed="DC_FAST"),
+            "EV-202": CSPEVVariable(ev_id="EV-202", priority="HIGH", battery_capacity=40.0,
+                                    current_battery=5.0, required_battery=15.0, charging_rate=50.0,
+                                    arrival_time=0, departure_deadline=30,
+                                    location={"x": 4.8, "y": 5.4}, charger_type_needed="DC_FAST"),
+            "EV-203": CSPEVVariable(ev_id="EV-203", priority="STANDARD", battery_capacity=60.0,
+                                    current_battery=5.0, required_battery=25.0, charging_rate=50.0,
+                                    arrival_time=0, departure_deadline=90,
+                                    location={"x": 5.5, "y": 4.7}, charger_type_needed="DC_FAST"),
+        }
+
+    elif scenario_name == "PROPAGATION_INFEASIBLE":
+        # Feasibility fails for a reason that pure arc consistency can detect: the four
+        # sessions need 150 charger-minutes inside a 120 minute window on a single charger.
+        # AC-3 removes the unsupported values and empties a domain *before* search begins,
+        # so this instance demonstrates constraint propagation proving unsatisfiability.
+        stations = {
+            "CS-NORTH": {
+                "id": "CS-NORTH",
+                "name": "Kazam EV - Hebbal Tech Park Supercharger",
+                "chargingPower": 200.0,
+                "energyPrice": 0.22,
+                "operatingStatus": "OPERATIONAL",
+                "location": {"x": 2.5, "y": 8.0},
+                "chargers": ["CS-NORTH-CH-1"]
+            }
+        }
+        chargers = {
+            "CS-NORTH-CH-1": {"id": "CS-NORTH-CH-1", "stationId": "CS-NORTH", "chargerType": "DC_FAST",
+                              "maximumPower": 50.0, "currentStatus": "AVAILABLE"},
+        }
+        evs = {
+            "EV-P1": CSPEVVariable(ev_id="EV-P1", battery_capacity=60.0, current_battery=5.0,
+                                   required_battery=15.0, charging_rate=50.0, arrival_time=0,
+                                   departure_deadline=30, charger_type_needed="DC_FAST"),
+            "EV-P2": CSPEVVariable(ev_id="EV-P2", battery_capacity=60.0, current_battery=5.0,
+                                   required_battery=25.0, charging_rate=50.0, arrival_time=0,
+                                   departure_deadline=60, charger_type_needed="DC_FAST"),
+            "EV-P3": CSPEVVariable(ev_id="EV-P3", battery_capacity=60.0, current_battery=5.0,
+                                   required_battery=35.0, charging_rate=50.0, arrival_time=0,
+                                   departure_deadline=90, charger_type_needed="DC_FAST"),
+            "EV-P4": CSPEVVariable(ev_id="EV-P4", battery_capacity=60.0, current_battery=5.0,
+                                   required_battery=45.0, charging_rate=50.0, arrival_time=0,
+                                   departure_deadline=120, charger_type_needed="DC_FAST"),
+        }
+
     elif scenario_name == "NO_FEASIBLE_SOLUTION":
         # Unfeasible: EV needs 60 kWh in 15 minutes (requires 240 kW), but charger max power is 50 kW!
         stations["CS-NORTH"]["operatingStatus"] = "FAULT"

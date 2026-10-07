@@ -39,6 +39,25 @@ class GraphEdge(BaseModel):
     road_type: str = "URBAN"
 
 
+def read_station_field(record: Dict, field_name: str, alias: str, default=None):
+    """
+    Read a station attribute that may be keyed either by field name (camelCase) or by alias
+    (snake_case, which is what `StationModel.model_dump()` produces because the model is
+    configured with `serialize_by_alias=True`).
+
+    This helper exists because the graph builder previously read only camelCase keys while
+    every API route passed `model_dump()` output. All lookups silently fell through to the
+    defaults, so station status, price, power and queue length shown to the search algorithms
+    were constant no matter what the simulation did - station faults never reached the search
+    screen. Accepting both spellings makes the live-state pipeline work as intended.
+    """
+    if field_name in record and record[field_name] is not None:
+        return record[field_name]
+    if alias in record and record[alias] is not None:
+        return record[alias]
+    return default
+
+
 class ChargingNetworkGraph:
     def __init__(self):
         self.nodes: Dict[str, GraphNode] = {}
@@ -112,20 +131,24 @@ class ChargingNetworkGraph:
         # 2. Charging Stations
         if stations:
             for s in stations:
-                st_id = s.get("id", "CS-GENERIC")
-                loc = s.get("location", {"x": 5.0, "y": 5.0})
-                queue = len(s.get("currentQueue", [])) or s.get("queue_length", 0)
-                chargers = s.get("chargers", [])
-                total_c = len(chargers) or s.get("numberOfChargers", 4)
-                avail_c = sum(1 for c in chargers if c.get("currentStatus") == "AVAILABLE") if chargers else s.get("available_chargers", 2)
-                pwr = s.get("chargingPower", 180.0)
-                price = s.get("energyPrice", 0.25)
-                c_types = s.get("chargerTypes", ["DC_FAST", "ULTRA_FAST"])
-                status = s.get("operatingStatus", "OPERATIONAL")
+                st_id = read_station_field(s, "id", "id", "CS-GENERIC")
+                loc = read_station_field(s, "location", "location", {"x": 5.0, "y": 5.0})
+                queue_list = read_station_field(s, "currentQueue", "current_queue", [])
+                queue = len(queue_list) if queue_list else read_station_field(s, "queue_length", "queue_length", 0)
+                chargers = read_station_field(s, "chargers", "chargers", [])
+                total_c = len(chargers) or read_station_field(s, "numberOfChargers", "number_of_chargers", 4)
+                avail_c = (
+                    sum(1 for c in chargers if read_station_field(c, "currentStatus", "current_status") == "AVAILABLE")
+                    if chargers else read_station_field(s, "available_chargers", "available_chargers", 2)
+                )
+                pwr = read_station_field(s, "chargingPower", "charging_power", 180.0)
+                price = read_station_field(s, "energyPrice", "energy_price", 0.25)
+                c_types = read_station_field(s, "chargerTypes", "charger_types", ["DC_FAST", "ULTRA_FAST"])
+                status = read_station_field(s, "operatingStatus", "operating_status", "OPERATIONAL")
 
                 node = GraphNode(
                     id=st_id,
-                    name=s.get("name", f"Station {st_id}"),
+                    name=read_station_field(s, "name", "name", f"Station {st_id}"),
                     node_type=NodeType.CHARGING_STATION,
                     x=loc.get("x", 5.0),
                     y=loc.get("y", 5.0),
@@ -203,5 +226,36 @@ class ChargingNetworkGraph:
 
         for e in edges:
             graph.add_edge(e, bidirectional=True)
+
+        # 4. Connectivity for dynamically supplied stations
+        # -------------------------------------------------
+        # The literal edge list above only covers the three core hubs. Real stations loaded
+        # from the public dataset (and any station injected later) would otherwise be isolated
+        # nodes that no search algorithm can ever reach. Each unconnected station is linked to
+        # its two nearest road waypoints using straight-line geometry as an approximation of
+        # the road link, with the same cost model as the hand-written edges.
+        if stations:
+            waypoint_nodes = [n for n in graph.nodes.values() if n.node_type == NodeType.WAYPOINT]
+            for s in stations:
+                st_id = read_station_field(s, "id", "id")
+                node = graph.nodes.get(st_id)
+                if node is None:
+                    continue
+                if graph.adjacency.get(st_id):
+                    continue  # already linked by the explicit edge list
+
+                nearest = sorted(waypoint_nodes, key=lambda w: node.euclidean_distance_to(w))[:2]
+                for waypoint in nearest:
+                    dist_km = round(node.euclidean_distance_to(waypoint), 2)
+                    graph.add_edge(
+                        GraphEdge(
+                            source_id=waypoint.id,
+                            target_id=st_id,
+                            distance_km=dist_km,
+                            travel_time_min=round(dist_km * 1.5, 1),
+                            travel_cost_usd=round(dist_km * 0.10, 2),
+                        ),
+                        bidirectional=True,
+                    )
 
         return graph

@@ -11,7 +11,7 @@ class KnowledgeBase:
         self._initialize_default_rules()
 
     def _initialize_default_rules(self):
-        """Populate classical AI rule base (Units I-IV logical reasoning)."""
+        """Populate the classical-AI rule base used for logical reasoning."""
         self.rules = [
             # Rule 1: IF EV is emergency THEN chargingPriority = CRITICAL
             Rule(
@@ -141,7 +141,10 @@ class KnowledgeBase:
             self.sync_from_simulation(sim_engine)
             subjects = list(sim_engine.evs.keys()) + list(sim_engine.stations.keys()) + ["GRID-TRANSFORMER-MAIN"]
         else:
-            subjects = list(self.fact_base.facts.keys())
+            # `FactBase.facts` is keyed by "subject:predicate", so the stored keys are NOT
+            # entity names. Passing them straight to the rule engine meant no antecedent ever
+            # resolved and forward chaining derived nothing. Recover the distinct subjects.
+            subjects = sorted({fact.subject for fact in self.fact_base.facts.values()})
         return InferenceEngine.forward_chain(self.fact_base, self.rules, subjects)
 
     def query_why_priority(self, ev_id: str, sim_engine=None) -> InferenceResult:

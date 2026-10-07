@@ -1,35 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { compareSearchAlgorithms, recommendStation, fetchSearchNetwork } from '../../services/api';
-import {
-  Compass,
-  CheckCircle2,
-  Clock,
-  Zap,
-  MapPin,
-  ArrowRight,
-  Loader2,
-  GitCompare,
-  TrendingDown,
-  Info
-} from 'lucide-react';
+import { PageHeader, Section, StatTile, StateBlock, Banner } from '../common';
+import { Compass, Loader2, Info, Network } from 'lucide-react';
+
+const ALGORITHM_TABS = ['ALL', 'A*', 'UCS', 'GBFS', 'BFS', 'DFS'];
+
+function numberOf(value, digits = 2, suffix = '') {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return 'n/a';
+  return `${Number(value).toFixed(digits)}${suffix}`;
+}
 
 export default function SearchComparisonView({ evs = [] }) {
-  // Scenario state
   const [selectedEvId, setSelectedEvId] = useState('EV-07');
   const [batteryPct, setBatteryPct] = useState(15.0);
   const [deadlineMin, setDeadlineMin] = useState(90.0);
   const [batteryCapacity, setBatteryCapacity] = useState(60.0);
   const [targetBatteryPct, setTargetBatteryPct] = useState(80.0);
 
-  // Results state
   const [networkGraph, setNetworkGraph] = useState(null);
-  const [algorithmResults, setAlgorithmResults] = useState([]);
-  const [recommendationData, setRecommendationData] = useState(null);
+  const [comparison, setComparison] = useState(null);
+  const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedAlgoTab, setSelectedAlgoTab] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('ALL');
 
   const isSocInvalid = parseFloat(batteryPct) >= parseFloat(targetBatteryPct);
+  const results = comparison?.comparison_matrix || [];
+  const metrics = comparison?.metrics;
+  const chosenAlgorithm = recommendation?.result?.algorithm || comparison?.algorithm;
 
   const loadPresetEV07 = () => {
     setSelectedEvId('EV-07');
@@ -40,12 +38,12 @@ export default function SearchComparisonView({ evs = [] }) {
     setError(null);
   };
 
-  const runEvaluation = async () => {
+  const runEvaluation = useCallback(async () => {
     if (isSocInvalid) return;
     setLoading(true);
     setError(null);
     try {
-      const scenarioPayload = {
+      const payload = {
         ev_id: selectedEvId,
         battery_percentage: parseFloat(batteryPct),
         battery_capacity_kwh: parseFloat(batteryCapacity),
@@ -59,312 +57,435 @@ export default function SearchComparisonView({ evs = [] }) {
 
       const [graphData, algoData, recData] = await Promise.all([
         fetchSearchNetwork(),
-        compareSearchAlgorithms(scenarioPayload),
-        recommendStation(scenarioPayload)
+        compareSearchAlgorithms(payload),
+        recommendStation(payload)
       ]);
 
       setNetworkGraph(graphData);
-      setAlgorithmResults(algoData.comparison_matrix || []);
-      setRecommendationData(recData);
+      setComparison(algoData);
+      setRecommendation(recData);
     } catch (err) {
-      console.error('Failed to run search evaluation', err);
-      setError(err.message || 'Failed to benchmark search algorithms.');
+      console.error('Failed to run the search evaluation', err);
+      setComparison(null);
+      setRecommendation(null);
+      setError(err.message || 'The search benchmark could not be completed.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEvId, batteryPct, batteryCapacity, targetBatteryPct, deadlineMin, isSocInvalid]);
 
   useEffect(() => {
     runEvaluation();
-  }, [selectedEvId]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleResults =
+    activeTab === 'ALL'
+      ? results
+      : results.filter((r) => String(r.algorithm).toUpperCase().includes(activeTab));
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Banner: Academic Context */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/40 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">UNIT II: SEARCH ALGORITHMS</span>
-              <span className="text-xs text-slate-500 font-mono">INFORMED VS UNINFORMED SEARCH</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Search Algorithm Benchmark &amp; Path Optimization
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Comparative benchmark of five classical graph search algorithms on the road network: 
-              Breadth-First Search (BFS), Depth-First Search (DFS), Uniform Cost Search (UCS), 
-              Greedy Best-First Search (GBFS), and A* Search.
-            </p>
-          </div>
+    <div className="page">
 
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={loadPresetEV07}
-              className="btn-secondary text-xs"
-            >
-              Benchmark EV-07
+      <PageHeader
+        eyebrow="Pipeline · stage 4"
+        title="Search algorithm comparison"
+        description="Breadth-first, depth-first, uniform cost, greedy best-first and A* search are executed on the same network snapshot. Every figure below is measured by the backend for this run."
+        actions={
+          <>
+            <button type="button" onClick={loadPresetEV07} className="btn-secondary">
+              Load sample vehicle
             </button>
             <button
+              type="button"
               onClick={runEvaluation}
-              disabled={loading}
-              className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
+              disabled={loading || isSocInvalid}
+              className="btn-primary"
             >
-              {loading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Compass className="w-3.5 h-3.5" />
-              )}
-              <span>Re-Run Comparison</span>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Compass className="h-4 w-4" />}
+              {loading ? 'Running…' : 'Run comparison'}
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Interactive Telematics Inputs */}
-      <div className="ai-card p-4">
-        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-          Vehicle Scenario Parameters
-        </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+      {/* Scenario inputs */}
+      <Section
+        title="Scenario parameters"
+        description="The same scenario is passed to all five algorithms so their results are comparable."
+      >
+        <div className="form-grid">
           <div>
-            <label className="form-label">Vehicle ID</label>
+            <label className="form-label" htmlFor="search-ev">Vehicle</label>
             <select
+              id="search-ev"
               value={selectedEvId}
               onChange={(e) => setSelectedEvId(e.target.value)}
-              className="form-input text-xs"
+              className="form-input"
             >
-              <option value="EV-07">EV-07 (Nexon EV)</option>
-              {evs.map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.id} ({ev.priority})</option>
+              <option value="EV-07">EV-07 (sample)</option>
+              {evs.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.id} · {ev.priority}
+                </option>
               ))}
             </select>
           </div>
-
           <div>
-            <label className="form-label">Current Battery SOC (%)</label>
+            <label className="form-label" htmlFor="search-soc">Current SOC (%)</label>
             <input
+              id="search-soc"
               type="number"
               min="5"
               max="95"
               value={batteryPct}
               onChange={(e) => setBatteryPct(e.target.value)}
-              className="form-input text-xs"
+              className="form-input"
             />
           </div>
-
           <div>
-            <label className="form-label">Target Battery SOC (%)</label>
+            <label className="form-label" htmlFor="search-target">Target SOC (%)</label>
             <input
+              id="search-target"
               type="number"
               min="50"
               max="100"
               value={targetBatteryPct}
               onChange={(e) => setTargetBatteryPct(e.target.value)}
-              className="form-input text-xs"
+              className="form-input"
             />
           </div>
-
           <div>
-            <label className="form-label">Deadline (min)</label>
+            <label className="form-label" htmlFor="search-capacity">Battery capacity (kWh)</label>
             <input
+              id="search-capacity"
+              type="number"
+              min="20"
+              max="120"
+              value={batteryCapacity}
+              onChange={(e) => setBatteryCapacity(e.target.value)}
+              className="form-input"
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="search-deadline">Deadline (min)</label>
+            <input
+              id="search-deadline"
               type="number"
               min="20"
               max="300"
               value={deadlineMin}
               onChange={(e) => setDeadlineMin(e.target.value)}
-              className="form-input text-xs"
+              className="form-input"
             />
           </div>
-
-          <div className="flex items-end col-span-2 sm:col-span-4 lg:col-span-1">
+          <div className="flex items-end">
             <button
+              type="button"
               onClick={runEvaluation}
-              className="w-full btn-secondary text-xs py-2"
+              disabled={loading || isSocInvalid}
+              className="btn-secondary w-full"
             >
-              Update Parameters
+              Apply and re-run
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Validation Warning */}
-      {isSocInvalid && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-800 flex items-center gap-2">
-          <Info className="w-4 h-4 text-rose-600 shrink-0" />
-          <span>
-            <strong>Invalid Scenario:</strong> Target Battery SOC ({targetBatteryPct}%) must be strictly greater than Current SOC ({batteryPct}%).
-          </span>
-        </div>
-      )}
+        {isSocInvalid && (
+          <Banner variant="error">
+            <strong>Invalid scenario.</strong> Target SOC ({targetBatteryPct}%) must be greater than
+            the current SOC ({batteryPct}%).
+          </Banner>
+        )}
+      </Section>
 
-      {/* Backend API Error Banner */}
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-rose-600 shrink-0" />
-            <span><strong>Search Benchmark Error:</strong> {error}</span>
-          </div>
-          <button
-            onClick={runEvaluation}
-            className="btn-secondary text-xs px-2.5 py-1 shrink-0"
-          >
-            Retry
-          </button>
-        </div>
+        <Banner
+          variant="error"
+          action={
+            <button type="button" onClick={runEvaluation} className="btn-secondary btn-sm">
+              Retry
+            </button>
+          }
+        >
+          <strong>Search benchmark failed.</strong> {error}
+        </Banner>
       )}
 
-      {/* CORE SPECIFICATION TABLE: Algorithm | Path Cost | Nodes Expanded | Runtime | Result */}
-      <div className="ai-card p-5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Algorithm Comparison Matrix
-            </h3>
-            <p className="text-xs text-slate-500">
-              Exact comparative performance metrics for informed and uninformed search strategies
-            </p>
+      {/* Network summary - real counts from the graph the algorithms traverse */}
+      <Section
+        title="Search graph"
+        description="The graph the algorithms traverse, built from the current station snapshot."
+      >
+        {networkGraph ? (
+          <div className="stat-grid">
+            <StatTile
+              label="Nodes"
+              value={networkGraph.nodes?.length ?? 0}
+              hint={`${(networkGraph.nodes || []).filter((n) => n.node_type === 'CHARGING_STATION').length} charging stations and ${(networkGraph.nodes || []).filter((n) => n.node_type === 'WAYPOINT').length} junctions`}
+            />
+            <StatTile
+              label="Edges"
+              value={networkGraph.edges?.length ?? 0}
+              hint="Directed road segments with distance, time and cost"
+            />
+            <StatTile
+              label="Vehicle"
+              value={selectedEvId}
+              size="sm"
+              hint={`SOC ${batteryPct}% → ${targetBatteryPct}%, deadline ${deadlineMin} min`}
+            />
+            <StatTile
+              label="Search algorithms run"
+              value={metrics?.algorithms_evaluated ?? results.length}
+              tone="primary"
+              hint="All run on this exact graph state"
+            />
           </div>
+        ) : (
+          <StateBlock
+            variant={loading ? 'loading' : 'empty'}
+            title={loading ? 'Loading the search graph' : 'Graph unavailable'}
+          />
+        )}
+      </Section>
 
-          {/* Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md text-xs">
-            {['ALL', 'A* Search', 'UCS', 'GBFS', 'BFS', 'DFS'].map((tab) => (
+      {/* Comparison table */}
+      <Section
+        title="Algorithm comparison matrix"
+        description="Path cost is the composite step cost of the returned route; nodes expanded counts every state the algorithm took off the frontier."
+        actions={
+          <div className="tabs" role="tablist" aria-label="Filter algorithms">
+            {ALGORITHM_TABS.map((tab) => (
               <button
                 key={tab}
-                onClick={() => setSelectedAlgoTab(tab)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
-                  selectedAlgoTab === tab
-                    ? 'bg-white text-blue-700 font-semibold shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+                className="tab"
               >
-                {tab}
+                {tab === 'ALL' ? 'All' : tab}
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="ai-table-container">
-          <table className="ai-table">
-            <thead>
-              <tr>
-                <th>Algorithm</th>
-                <th>Type</th>
-                <th className="text-right">Path Cost ($ / km)</th>
-                <th className="text-center">Nodes Expanded</th>
-                <th className="text-right">Runtime (ms)</th>
-                <th>Result (Chosen Station)</th>
-                <th>Path Waypoints</th>
-              </tr>
-            </thead>
-            <tbody>
-              {algorithmResults.length > 0 ? (
-                algorithmResults
-                  .filter(res => selectedAlgoTab === 'ALL' || res.algorithm.includes(selectedAlgoTab))
-                  .map((res) => {
-                    const isAStar = res.algorithm === 'A* Search';
-                    const isOptimal = res.algorithm === 'A* Search' || res.algorithm === 'UCS';
-
+        }
+      >
+        {loading && results.length === 0 ? (
+          <StateBlock
+            variant="loading"
+            title="Benchmarking the algorithms"
+            detail="Each algorithm is searched independently over the same graph."
+          />
+        ) : visibleResults.length === 0 ? (
+          <StateBlock
+            variant="empty"
+            title="No result for this filter"
+            detail="Run the comparison again or choose a different algorithm."
+          />
+        ) : (
+          <div className="ai-table-container">
+            <table className="ai-table">
+              <thead>
+                <tr>
+                  <th>Algorithm</th>
+                  <th>Class</th>
+                  <th className="num">Path cost</th>
+                  <th className="num">Nodes expanded</th>
+                  <th className="num">Runtime</th>
+                  <th className="num">Duration</th>
+                  <th className="num">Charging cost</th>
+                  <th>Station reached</th>
+                  <th>Route</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleResults.map((res) => {
+                  const isChosen = res.algorithm === chosenAlgorithm;
+                  const informed = ['A*', 'Greedy'].some((k) => String(res.algorithm).includes(k));
                   return (
-                    <tr
-                      key={res.algorithm}
-                      className={isAStar ? 'bg-blue-50/40 font-semibold' : ''}
-                    >
-                      <td className="font-bold text-slate-900">
-                        <div className="flex items-center gap-2">
-                          <span>{res.algorithm}</span>
-                          {isAStar && (
-                            <span className="badge-blue text-[9px]">RECOMMENDED</span>
-                          )}
-                        </div>
+                    <tr key={res.algorithm} className={isChosen ? 'row-selected' : ''}>
+                      <td className="font-semibold text-slate-900">
+                        <span className="flex items-center gap-2">
+                          {res.algorithm}
+                          {isChosen && <span className="badge-blue">Selected</span>}
+                        </span>
                       </td>
-
                       <td>
-                        <span className="text-xs text-slate-600">
-                          {['A* Search', 'Greedy Best-First'].includes(res.algorithm) ? (
-                            <span className="text-blue-700 font-medium">Informed ($f = g + h$)</span>
-                          ) : (
-                            <span className="text-slate-500">Uninformed</span>
-                          )}
+                        <span className={informed ? 'badge-teal' : 'badge-slate'}>
+                          {informed ? 'Informed' : 'Uninformed'}
                         </span>
                       </td>
-
-                      <td className="text-right font-mono font-bold text-slate-900">
-                        {res.success && res.path_cost >= 0 ? `$${res.path_cost?.toFixed(2)}` : 'N/A'}
+                      <td className="num">{res.success ? numberOf(res.path_cost, 4) : 'n/a'}</td>
+                      <td className="num">{numberOf(res.nodes_explored, 0)}</td>
+                      <td className="num">{numberOf(res.execution_time_ms, 2, ' ms')}</td>
+                      <td className="num">{numberOf(res.total_duration_min, 1, ' min')}</td>
+                      <td className="num">
+                        {res.total_charging_cost_usd === undefined
+                          ? 'n/a'
+                          : `$${numberOf(res.total_charging_cost_usd, 2)}`}
                       </td>
-
-                      <td className="text-center font-mono">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-800 font-bold border border-slate-200">
-                          {res.nodes_explored}
-                        </span>
-                      </td>
-
-                      <td className="text-right font-mono text-slate-600">
-                        {res.execution_time_ms} ms
-                      </td>
-
                       <td>
-                        <span className={`px-2 py-0.5 text-xs font-semibold rounded ${
-                          res.success ? 'badge-emerald' : 'badge-rose'
-                        }`}>
-                          {res.selected_station || 'No Goal Found'}
-                        </span>
+                        {res.success ? (
+                          <span className="badge-emerald">{res.selected_station || 'reached'}</span>
+                        ) : (
+                          <span className="badge-rose">No goal found</span>
+                        )}
                       </td>
-
-                      <td className="text-slate-500 font-mono text-[11px] max-w-xs truncate" title={res.path_names?.join(' → ')}>
-                        {res.path_names?.join(' → ') || 'None'}
+                      <td
+                        className="col-code max-w-[22rem] truncate"
+                        title={(res.path_names || []).join(' → ')}
+                      >
+                        {(res.path_names || []).join(' → ') || '—'}
                       </td>
                     </tr>
                   );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="7" className="text-center py-8 text-slate-500">
-                    {loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                        <span>Benchmarking algorithms across network graph...</span>
-                      </span>
-                    ) : (
-                      <span>No benchmark results available. Click &ldquo;Re-Run Comparison&rdquo; to benchmark.</span>
-                    )}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mathematical Analysis & Admissibility Card */}
-        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2 text-xs text-slate-700">
-          <div className="flex items-center gap-2 font-bold text-slate-900">
-            <Info className="w-4 h-4 text-blue-600" />
-            <span>Why A* Search is Strictly Optimal and Efficient:</span>
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 text-[11px]">
-            <div className="p-2.5 bg-white border border-slate-200 rounded">
-              <strong className="text-slate-900 block mb-0.5">1. Admissible Heuristic</strong>
-              <p className="text-slate-600">
-                The Euclidean distance heuristic $h(n) \le h^*(n)$ never overestimates the true travel distance, guaranteeing mathematical optimality.
-              </p>
-            </div>
-            <div className="p-2.5 bg-white border border-slate-200 rounded">
-              <strong className="text-slate-900 block mb-0.5">2. Significant Pruning</strong>
-              <p className="text-slate-600">
-                Unlike uninformed BFS and UCS which expand concentric waves across all directions, A* expands fewer states by guiding exploration toward the goal.
-              </p>
-            </div>
-            <div className="p-2.5 bg-white border border-slate-200 rounded">
-              <strong className="text-slate-900 block mb-0.5">3. Defeating Greedy Search</strong>
-              <p className="text-slate-600">
-                Greedy Best-First can be tricked by local detours and high tariffs because it ignores cumulative path cost $g(n)$, whereas A* balances $g(n) + h(n)$.
-              </p>
-            </div>
-          </div>
-        </div>
+        )}
 
-      </div>
+        {comparison?.explanation && (
+          <p className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-600">
+            <Info className="mt-px h-3.5 w-3.5 shrink-0 text-slate-400" />
+            {comparison.explanation}
+          </p>
+        )}
+      </Section>
+
+      {/* Measured comparison of the informed search */}
+      {metrics && (
+        <Section
+          title="What the measurements show"
+          description="These values are computed from the run above; no result is assumed in advance."
+        >
+          <div className="stat-grid">
+            <StatTile
+              label="Optimal path cost"
+              value={numberOf(metrics.optimal_path_cost, 4)}
+              tone="success"
+              hint="Cost of the optimal route found in this run"
+            />
+            <StatTile
+              label="A* matches optimum"
+              value={metrics.astar_matches_ucs_optimum ? 'Yes' : 'No'}
+              tone={metrics.astar_matches_ucs_optimum ? 'success' : 'warning'}
+              hint="Whether A* returned the same cost as uniform cost search"
+            />
+            <StatTile
+              label="Nodes: UCS vs A*"
+              value={`${metrics.ucs_nodes_explored ?? 'n/a'} / ${metrics.astar_nodes_explored ?? 'n/a'}`}
+              hint="Uniform cost search expanded this many, A* expanded the second count"
+            />
+            <StatTile
+              label="A* node saving"
+              value={numberOf(metrics.astar_node_saving_pct, 1, '%')}
+              tone="primary"
+              hint="Reduction in expanded nodes relative to uniform cost search"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              [
+                'Heuristic',
+                'A* and greedy best-first order the frontier using a straight-line distance estimate that never exceeds the true remaining distance.'
+              ],
+              [
+                'Optimality',
+                'A* and uniform cost search are admissible-cost algorithms; the table above shows whether they agreed on this run.'
+              ],
+              [
+                'Greedy search',
+                'Greedy best-first ignores the accumulated cost and can therefore commit to a locally closer but more expensive route.'
+              ]
+            ].map(([title, text]) => (
+              <div key={title} className="rounded-md border border-slate-200 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                  <Network className="h-3.5 w-3.5 text-blue-600" />
+                  {title}
+                </p>
+                <p className="mt-1 text-2xs leading-relaxed text-slate-500">{text}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Recommended plan from /search/solve */}
+      {recommendation?.result && (
+        <Section
+          title="Recommended plan"
+          description="The route and schedule the station-selection endpoint returned for these parameters."
+        >
+          <div className="stat-grid">
+            <StatTile label="Algorithm used" value={recommendation.result.algorithm} size="sm" />
+            <StatTile
+              label="Selected station"
+              value={recommendation.result.selected_station || 'n/a'}
+              size="sm"
+              tone="primary"
+            />
+            <StatTile
+              label="Total duration"
+              value={numberOf(recommendation.result.total_duration_min, 1, '')}
+              unit="min"
+              size="sm"
+              hint="Driving plus charging plus queueing"
+            />
+            <StatTile
+              label="Charging cost"
+              value={
+                recommendation.result.total_charging_cost_usd === undefined
+                  ? 'n/a'
+                  : numberOf(recommendation.result.total_charging_cost_usd, 2, '')
+              }
+              unit={recommendation.result.total_charging_cost_usd === undefined ? undefined : 'USD'}
+              size="sm"
+            />
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <span className="kv-term">Route</span>
+            <p className="mt-1 break-words font-mono text-xs text-slate-800">
+              {(recommendation.result.path || []).join(' → ') || '—'}
+            </p>
+          </div>
+
+          {(recommendation.result.actions || []).length > 0 && (
+            <div className="ai-table-container">
+              <table className="ai-table">
+                <thead>
+                  <tr>
+                    <th className="num">Step</th>
+                    <th>Action</th>
+                    <th>From → to</th>
+                    <th className="num">Distance</th>
+                    <th className="num">Travel time</th>
+                    <th className="num">Queue wait</th>
+                    <th className="num">Energy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recommendation.result.actions.map((step, i) => (
+                    <tr key={i}>
+                      <td className="num">{i + 1}</td>
+                      <td className="font-medium text-slate-800">{step.action_type}</td>
+                      <td className="col-code">
+                        {step.edge?.source_id} → {step.edge?.target_id}
+                      </td>
+                      <td className="num">{numberOf(step.edge?.distance_km, 2, ' km')}</td>
+                      <td className="num">{numberOf(step.edge?.travel_time_min, 1, ' min')}</td>
+                      <td className="num">{numberOf(step.queue_wait_min, 1, ' min')}</td>
+                      <td className="num">{numberOf(step.charging_kwh, 2, ' kWh')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      )}
 
     </div>
   );

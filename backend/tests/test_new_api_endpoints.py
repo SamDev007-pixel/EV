@@ -178,7 +178,10 @@ def test_api_health():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert "Classical Artificial Intelligence" in data["ai_foundation"]
+    # The health payload describes the AI foundation in plain engineering terms; it must
+    # not reference course units.
+    assert "artificial intelligence" in data["ai_foundation"].lower()
+    assert "unit" not in data["ai_foundation"].lower()
 
 
 def test_api_problem_formulate():

@@ -194,15 +194,23 @@ class StationSelectorEngine:
             "astar_search_result": astar_res.model_dump()
         }
 
-    def run_algorithm_comparison(self, scenario: EVScenario) -> Dict[str, Any]:
+    def run_algorithm_comparison(
+        self,
+        scenario: EVScenario,
+        stations_override: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
         """
         Runs all 5 classical search algorithms (BFS, DFS, UCS, GBFS, A*) on the same search problem.
         Returns detailed comparison matrix.
+
+        `stations_override` lets the caller inject the live simulation stations (including
+        faults and queue lengths) so that the comparison reflects the current environment
+        instead of always using the static default network.
         """
         initial_kwh = scenario.battery_capacity_kwh * (scenario.battery_percentage / 100.0)
         required_kwh = scenario.battery_capacity_kwh * (scenario.target_battery_percentage / 100.0)
 
-        graph = ChargingNetworkGraph.create_default_network()
+        graph = ChargingNetworkGraph.create_default_network(stations=stations_override)
 
         origin_node = GraphNode(
             id=f"ORIGIN-{scenario.ev_id}",
@@ -266,5 +274,6 @@ class StationSelectorEngine:
         return {
             "scenario": scenario.model_dump(),
             "graph": graph.to_dict(),
+            "station_source": ("LIVE_SIMULATION_STATE" if stations_override else "STATIC_DEFAULT_NETWORK"),
             "comparison_matrix": [r.model_dump() for r in results]
         }

@@ -11,8 +11,7 @@ import {
   AgentActivityView,
   AgentNegotiationLogView,
   DecisionExplanationView,
-  SystemEvaluationView,
-  SyllabusMappingView
+  SystemEvaluationView
 } from './components';
 
 import {
@@ -21,6 +20,26 @@ import {
   stepSimulation,
   resetSimulation
 } from './services/api';
+
+const VALID_TABS = [
+  'dashboard',
+  'ev_request',
+  'station_search',
+  'search_comparison',
+  'scheduling',
+  'knowledge_logic',
+  'agents',
+  'conflict_decision',
+  'explanation',
+  'evaluation'
+];
+
+const HASH_ALIASES = {
+  search: 'search_comparison',
+  csp: 'scheduling',
+  logic: 'knowledge_logic',
+  negotiation: 'conflict_decision'
+};
 
 export default function App() {
   const [simState, setSimState] = useState(null);
@@ -32,40 +51,14 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Sync route hashes
+  // Resolve the active page from the URL hash / path.
   useEffect(() => {
-    // Ensure light theme is active
-    const root = document.documentElement;
-    root.classList.remove('dark');
-    root.classList.add('light');
-
-    const validTabs = [
-      'dashboard',
-      'ev_request',
-      'station_search',
-      'search_comparison',
-      'scheduling',
-      'knowledge_logic',
-      'agents',
-      'conflict_decision',
-      'explanation',
-      'evaluation',
-      'syllabus'
-    ];
-
     const checkRoute = () => {
-      const h = window.location.hash.replace(/^#\/?/, '') || window.location.pathname.replace(/^\//, '');
-      if (validTabs.includes(h)) {
-        setActiveTab(h);
-      } else if (h === 'search') {
-        setActiveTab('search_comparison');
-      } else if (h === 'csp') {
-        setActiveTab('scheduling');
-      } else if (h === 'logic') {
-        setActiveTab('knowledge_logic');
-      } else if (h === 'negotiation') {
-        setActiveTab('conflict_decision');
-      }
+      const h =
+        window.location.hash.replace(/^#\/?/, '') ||
+        window.location.pathname.replace(/^\//, '');
+      if (VALID_TABS.includes(h)) setActiveTab(h);
+      else if (HASH_ALIASES[h]) setActiveTab(HASH_ALIASES[h]);
     };
 
     checkRoute();
@@ -84,7 +77,9 @@ export default function App() {
       setError(null);
     } catch (err) {
       console.error('Failed to load simulation state', err);
-      setError('Backend API unreachable. Please confirm python run.py is running on port 8000.');
+      setError(
+        'The backend API is unreachable. Start it with "python run.py" inside the backend folder (default port 8000), then reload this page.'
+      );
     } finally {
       setLoading(false);
     }
@@ -106,8 +101,7 @@ export default function App() {
     try {
       const updated = await stepSimulation();
       setSimState(updated);
-      const logs = await fetchAgentLogs();
-      setAgentLogs(logs);
+      setAgentLogs(await fetchAgentLogs());
     } catch (err) {
       console.error(err);
     }
@@ -117,8 +111,7 @@ export default function App() {
     try {
       const reset = await resetSimulation();
       setSimState(reset);
-      const logs = await fetchAgentLogs();
-      setAgentLogs(logs);
+      setAgentLogs(await fetchAgentLogs());
     } catch (err) {
       console.error(err);
     }
@@ -126,22 +119,21 @@ export default function App() {
 
   if (loading && !simState) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-base font-bold text-slate-900">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-surface-app p-6 text-center">
+        <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-blue-600 border-t-transparent" />
+        <h2 className="mt-4 text-base font-bold text-slate-900">
           Intelligent EV Charging &amp; Resource Management System
         </h2>
-        <p className="text-xs text-slate-500 mt-1">
-          Loading Classical AI Reasoning Engines &amp; Knowledge Base...
+        <p className="mt-1 text-xs text-slate-500">
+          Loading the decision engines and the knowledge base&hellip;
         </p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      
-      {/* 1. Sidebar Navigation */}
+    <div className="flex min-h-screen flex-col bg-surface-app font-sans text-slate-900">
+
       <Sidebar
         activeTab={activeTab}
         onSelectTab={handleSelectTab}
@@ -150,28 +142,29 @@ export default function App() {
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* 2. Main Layout Container */}
-      <div className={`flex-1 flex flex-col transition-all duration-200 ease-in-out ${
-        isSidebarOpen ? 'lg:pl-64 xl:pl-72' : 'lg:pl-16'
-      }`}>
-        
-        {/* Top Sticky Header */}
+      {/* Content column, offset by the sidebar width */}
+      <div
+        className={`flex flex-1 flex-col transition-[padding] duration-200 ease-in-out ${
+          isSidebarOpen ? 'lg:pl-64 xl:pl-72' : 'lg:pl-16'
+        }`}
+      >
+
         <Header
-          currentTick={simState?.current_tick_min || 0}
-          activeTab={activeTab}
+          currentTick={simState?.current_tick_min ?? 0}
+          strategyName={simState?.strategy_name}
+          onToggleSidebar={() => setIsSidebarOpen(true)}
         />
 
-        {/* Global Error Banner */}
         {error && (
-          <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 text-xs text-rose-800 text-center font-medium">
-            {error}
+          <div className="border-b border-rose-200 bg-rose-50">
+            <div className="mx-auto max-w-content px-4 py-2.5 text-xs font-medium text-rose-800 sm:px-6 lg:px-8">
+              {error}
+            </div>
           </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          
-          {/* TAB 1: DASHBOARD */}
+        {/* Single page container shared by every screen */}
+        <main className="mx-auto w-full max-w-content flex-1 px-4 py-6 sm:px-6 lg:px-8">
           {activeTab === 'dashboard' && (
             <DashboardView
               simState={simState}
@@ -181,7 +174,6 @@ export default function App() {
             />
           )}
 
-          {/* TAB 2: EV REQUEST */}
           {activeTab === 'ev_request' && (
             <EVRequestView
               onSelectTab={handleSelectTab}
@@ -189,7 +181,6 @@ export default function App() {
             />
           )}
 
-          {/* TAB 3: STATION SEARCH */}
           {activeTab === 'station_search' && (
             <StationSearchView
               stations={simState?.stations || []}
@@ -198,19 +189,12 @@ export default function App() {
             />
           )}
 
-          {/* TAB 4: AI SEARCH COMPARISON */}
           {activeTab === 'search_comparison' && (
-            <SearchComparisonView
-              evs={simState?.evs || []}
-            />
+            <SearchComparisonView evs={simState?.evs || []} />
           )}
 
-          {/* TAB 5: SMART SCHEDULING (CSP) */}
-          {activeTab === 'scheduling' && (
-            <CSPSchedulerView />
-          )}
+          {activeTab === 'scheduling' && <CSPSchedulerView />}
 
-          {/* TAB 6: KNOWLEDGE & LOGIC */}
           {activeTab === 'knowledge_logic' && (
             <LogicReasoningView
               evs={simState?.evs || []}
@@ -218,7 +202,6 @@ export default function App() {
             />
           )}
 
-          {/* TAB 7: AGENT SYSTEM */}
           {activeTab === 'agents' && (
             <AgentActivityView
               agents={simState?.agents || []}
@@ -227,46 +210,27 @@ export default function App() {
             />
           )}
 
-          {/* TAB 8: CONFLICT / GAME DECISION */}
-          {activeTab === 'conflict_decision' && (
-            <AgentNegotiationLogView />
-          )}
+          {activeTab === 'conflict_decision' && <AgentNegotiationLogView />}
 
-          {/* TAB 9: DECISION EXPLANATION */}
           {activeTab === 'explanation' && (
-            <DecisionExplanationView
-              onSelectTab={handleSelectTab}
-            />
+            <DecisionExplanationView onSelectTab={handleSelectTab} />
           )}
 
-          {/* TAB 10: EVALUATION */}
-          {activeTab === 'evaluation' && (
-            <SystemEvaluationView />
-          )}
-
-          {/* TAB 11: FOAI SYLLABUS MAPPING */}
-          {activeTab === 'syllabus' && (
-            <SyllabusMappingView
-              onSelectTab={handleSelectTab}
-            />
-          )}
-
+          {activeTab === 'evaluation' && <SystemEvaluationView />}
         </main>
 
-        {/* Clean Professional Footer */}
-        <footer className="border-t border-slate-200 py-4 px-6 bg-white text-center text-xs text-slate-500 font-sans mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <footer className="mt-auto border-t border-slate-200 bg-white">
+          <div className="mx-auto flex max-w-content flex-col items-center justify-between gap-2 px-4 py-4 text-2xs text-slate-500 sm:flex-row sm:px-6 lg:px-8">
             <span>
-              Intelligent EV Charging &amp; Resource Management System &bull; Foundations of Artificial Intelligence (FOAI)
+              Intelligent EV Charging &amp; Resource Management System
             </span>
-            <span className="text-slate-400 font-mono text-[11px]">
-              100% Classical AI &bull; No ML / No LLMs
+            <span className="font-mono text-slate-400">
+              Deterministic classical AI &bull; no machine learning
             </span>
           </div>
         </footer>
 
       </div>
-
     </div>
   );
 }

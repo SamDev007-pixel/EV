@@ -38,6 +38,10 @@ class EVModel(BaseModel):
     assignedChargerId: Optional[str] = Field(None, alias="assigned_charger_id")
     totalCostUSD: float = Field(0.0, alias="total_cost_usd", ge=0)
     waitTimeMin: int = Field(0, alias="wait_time_min", ge=0)
+    # Straight-line distance (km) to the station this EV was assigned to, captured at
+    # assignment time. Needed because `assignedStationId` is cleared when the session ends,
+    # so a post-run measurement could not recover how far the vehicle actually drove.
+    travelDistanceKm: float = Field(0.0, alias="travel_distance_km", ge=0)
 
     @property
     def chargingRequired(self) -> float:

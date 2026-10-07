@@ -1,239 +1,302 @@
 import React, { useState } from 'react';
-import {
-  Compass,
-  MapPin,
-  Zap,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Filter,
-  ArrowRight,
-  Layers,
-  Search
-} from 'lucide-react';
+import { Compass, MapPin, Zap, ArrowRight, Search, Filter } from 'lucide-react';
 import LiveNetworkMap from './LiveNetworkMap';
+import { PageHeader, Section, StatTile, StateBlock } from '../common';
+
+const CHARGER_TYPES = ['DC_FAST', 'ULTRA_FAST', 'AC_SLOW'];
+
+function chargerTypesOf(station) {
+  if (Array.isArray(station.charger_types) && station.charger_types.length > 0) {
+    return station.charger_types;
+  }
+  return Array.from(new Set((station.chargers || []).map((c) => c.charger_type))).filter(Boolean);
+}
 
 export default function StationSearchView({ stations = [], evs = [], onSelectTab }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedConnector, setSelectedConnector] = useState('ALL');
-  const [selectedStation, setSelectedStation] = useState(stations[0] || null);
+  const [selectedStation, setSelectedStation] = useState(null);
 
-  // Filter stations based on search query and connector
-  const filteredStations = stations.filter(st => {
-    const matchesQuery = st.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         st.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (st.location_name && st.location_name.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    if (!matchesQuery) return false;
+  const query = searchQuery.trim().toLowerCase();
 
+  const filteredStations = stations.filter((st) => {
+    const haystack = [st.name, st.id, st.address, st.operator_name]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    if (query && !haystack.includes(query)) return false;
     if (selectedConnector === 'ALL') return true;
-    return st.connectors && st.connectors.includes(selectedConnector);
+    return chargerTypesOf(st).includes(selectedConnector);
   });
 
+  const operational = stations.filter((s) => s.operating_status === 'OPERATIONAL').length;
+  const totalChargers = stations.reduce((acc, s) => acc + (s.chargers?.length || 0), 0);
+  const freeChargers = stations.reduce(
+    (acc, s) => acc + (s.chargers || []).filter((c) => c.current_status === 'AVAILABLE').length,
+    0
+  );
+
   return (
-    <div className="space-y-6">
-      
-      {/* View Header */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/40 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">SPATIAL HEURISTIC NETWORK</span>
-              <span className="text-xs text-slate-500 font-mono">SEARCH CANDIDATES &amp; TOPOLOGY</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Charging Station Network &amp; Spatial Search
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Explore physical hub topology, Euclidean distances, real-time bay availability, and estimated waiting 
-              times feeding the graph search algorithms.
-            </p>
-          </div>
+    <div className="page">
 
+      <PageHeader
+        eyebrow="Pipeline · stage 3"
+        title="Charging station network"
+        description="The candidate set that the search algorithms explore: station locations, supported charger types, live bay availability, published tariff and queue state."
+        actions={
           <button
+            type="button"
             onClick={() => onSelectTab('search_comparison')}
-            className="btn-primary text-xs flex items-center gap-1.5 self-start md:self-center"
+            className="btn-primary"
           >
-            <span>Run Search Algorithm Comparison</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            Compare search algorithms
+            <ArrowRight className="h-4 w-4" />
           </button>
-        </div>
+        }
+      />
+
+      <div className="stat-grid">
+        <StatTile label="Stations" value={stations.length} hint="Records in the environment snapshot" />
+        <StatTile
+          label="Operational"
+          value={operational}
+          tone="success"
+          hint={`${stations.length - operational} degraded, overloaded or faulted`}
+        />
+        <StatTile
+          label="Chargers modelled"
+          value={totalChargers}
+          hint={`${freeChargers} currently available`}
+        />
+        <StatTile label="Vehicles in simulation" value={evs.length} />
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="ai-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Search stations by name, code or zone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="form-input pl-9 text-xs"
-          />
-        </div>
-
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="flex items-center gap-1 text-xs text-slate-500">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Connector:</span>
+      <Section
+        title="Filter stations"
+        description="Filtering happens on the loaded snapshot and does not call the backend again."
+      >
+        <div className="toolbar">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name, code, operator or address…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="form-input pl-9"
+              aria-label="Search stations"
+            />
           </div>
-          <select
-            value={selectedConnector}
-            onChange={(e) => setSelectedConnector(e.target.value)}
-            className="form-input text-xs py-1.5"
-          >
-            <option value="ALL">All Connectors</option>
-            <option value="CCS2">CCS2 (DC Fast)</option>
-            <option value="Type 2">Type 2 (AC Normal)</option>
-            <option value="CHAdeMO">CHAdeMO</option>
-          </select>
-        </div>
-      </div>
 
-      {/* Main Grid: Interactive Map + Station List */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Column (6 Cols): Clean Map View */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="ai-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-900">Spatial Topology Map</h3>
-              </div>
-              <span className="text-[11px] text-slate-500 font-mono">
-                {stations.length} Hub Nodes
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Filter className="h-3.5 w-3.5" />
+              Charger type
+            </span>
+            <select
+              value={selectedConnector}
+              onChange={(e) => setSelectedConnector(e.target.value)}
+              className="form-input w-auto"
+              aria-label="Filter by charger type"
+            >
+              <option value="ALL">All types</option>
+              {CHARGER_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace('_', ' ')}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div className="h-[440px] rounded-lg overflow-hidden border border-slate-200">
-              <LiveNetworkMap stations={stations} evs={evs} />
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Available Hub
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Occupied / Queued
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Grid Overload
-              </span>
-            </div>
+          <div className="toolbar-end">
+            <span className="text-xs text-slate-500">
+              {filteredStations.length} of {stations.length} shown
+            </span>
+            {(searchQuery || selectedConnector !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setSelectedConnector('ALL');
+                }}
+                className="btn-secondary btn-sm"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
+      </Section>
 
-        {/* Right Column (6 Cols): Station Information List & Search Results */}
-        <div className="lg:col-span-6 space-y-4">
-          <div className="ai-card p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Compass className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  Station Search Results ({filteredStations.length})
-                </h3>
-              </div>
-              <span className="text-xs text-slate-500">
-                Sorted by Admissible Distance
-              </span>
-            </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {filteredStations.length > 0 ? (
-                filteredStations.map((station) => {
-                  const totalBays = station.chargers?.length || station.total_bays || 2;
-                  const freeBays = Math.max(0, totalBays - (station.occupied_bays || 0));
-                  const isSelected = selectedStation?.id === station.id;
-                  const isOperational = station.status === 'AVAILABLE' || station.status === 'OPERATIONAL';
-                  const waitTime = isOperational ? (station.queue_length || 0) * 15 : 999;
+        {/* Map column: LiveNetworkMap renders its own card, so no extra wrapper here. */}
+        <div className="min-w-0">
+          <LiveNetworkMap stations={stations} evs={evs} />
+        </div>
 
-                  return (
-                    <div
-                      key={station.id}
-                      onClick={() => setSelectedStation(station)}
-                      className={`p-4 border rounded-lg transition-all cursor-pointer ${
-                        isSelected
-                          ? 'border-blue-500 bg-blue-50/20 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                              {station.id}
-                            </span>
-                            <h4 className="text-sm font-bold text-slate-900">{station.name}</h4>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
-                            <MapPin className="w-3 h-3 text-slate-400" />
-                            <span>{station.location_name || `Coordinates (${station.x?.toFixed(1) || 0}, ${station.y?.toFixed(1) || 0})`}</span>
-                          </p>
-                        </div>
+        {/* Station list */}
+        <Section
+          title={`Stations (${filteredStations.length})`}
+          description="Free bay counts and charger types come from the same records the solver reads."
+        >
+          {filteredStations.length === 0 ? (
+            <StateBlock
+              variant="empty"
+              title="No station matches the filter"
+              detail={
+                query
+                  ? `Nothing matched “${searchQuery}” with the selected charger type.`
+                  : 'No station includes the selected charger type.'
+              }
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedConnector('ALL');
+                  }}
+                  className="btn-secondary btn-sm"
+                >
+                  Clear filters
+                </button>
+              }
+            />
+          ) : (
+            <div className="space-y-3">
+              {filteredStations.map((station) => {
+                const chargers = station.chargers || [];
+                const totalBays = chargers.length || station.number_of_chargers || 0;
+                const freeBays = chargers.filter((c) => c.current_status === 'AVAILABLE').length;
+                const isSelected = selectedStation?.id === station.id;
+                const isOperational = station.operating_status === 'OPERATIONAL';
+                const queueLength = (station.current_queue || []).length;
+                const types = chargerTypesOf(station);
 
-                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
-                          isOperational ? 'badge-emerald' : 'badge-rose'
-                        }`}>
-                          {station.status}
-                        </span>
-                      </div>
-
-                      {/* Telemetrics Bar */}
-                      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-4 gap-2 text-center text-xs">
-                        <div className="p-1.5 bg-slate-50 rounded">
-                          <span className="text-[10px] text-slate-400 block uppercase">Power</span>
-                          <strong className="text-slate-800 font-mono">{station.max_power_kw || 150} kW</strong>
-                        </div>
-                        <div className="p-1.5 bg-slate-50 rounded">
-                          <span className="text-[10px] text-slate-400 block uppercase">Free Bays</span>
-                          <strong className="text-emerald-700 font-mono">{freeBays}/{totalBays}</strong>
-                        </div>
-                        <div className="p-1.5 bg-slate-50 rounded">
-                          <span className="text-[10px] text-slate-400 block uppercase">Est. Wait</span>
-                          <strong className="text-slate-800 font-mono">{waitTime} min</strong>
-                        </div>
-                        <div className="p-1.5 bg-slate-50 rounded">
-                          <span className="text-[10px] text-slate-400 block uppercase">Tariff</span>
-                          <strong className="text-blue-700 font-mono">${station.price_per_kwh || 0.28}/kWh</strong>
-                        </div>
-                      </div>
-
-                      {/* Connectors Supported */}
-                      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] text-slate-400 font-semibold uppercase">Hardware:</span>
-                        {(station.connectors || ['CCS2', 'Type 2']).map((c, i) => (
-                          <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 font-mono">
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="p-8 text-center bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-                  <Compass className="w-8 h-8 text-slate-400 mx-auto" />
-                  <h4 className="text-sm font-semibold text-slate-800">No Charging Stations Found</h4>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    No stations match your current search query &ldquo;{searchQuery}&rdquo; or connector filter &ldquo;{selectedConnector}&rdquo;.
-                  </p>
+                return (
                   <button
+                    key={station.id}
                     type="button"
-                    onClick={() => { setSearchQuery(''); setSelectedConnector('ALL'); }}
-                    className="btn-secondary text-xs inline-flex items-center gap-1.5"
+                    onClick={() => setSelectedStation(isSelected ? null : station)}
+                    className={`w-full rounded-lg border p-4 text-left transition-colors ${
+                      isSelected
+                        ? 'border-blue-400 bg-blue-50/50'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                    }`}
                   >
-                    <span>Clear All Filters</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="col-code badge-slate">{station.id}</span>
+                          <h3 className="truncate text-sm font-bold text-slate-900">
+                            {station.name}
+                          </h3>
+                        </div>
+                        <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                          <MapPin className="h-3 w-3 shrink-0 text-slate-400" />
+                          <span className="truncate">
+                            {station.address ||
+                              (station.location
+                                ? `Grid position (${Number(station.location.x).toFixed(1)}, ${Number(station.location.y).toFixed(1)})`
+                                : 'Location unavailable')}
+                          </span>
+                        </p>
+                      </div>
+                      <span className={isOperational ? 'badge-emerald' : 'badge-rose'}>
+                        {station.operating_status}
+                      </span>
+                    </div>
+
+                    <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 sm:grid-cols-4">
+                      <div>
+                        <dt className="kv-term">Capacity</dt>
+                        <dd className="kv-value font-mono">
+                          {Number(station.charging_power ?? 0).toFixed(0)} kW
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="kv-term">Bays free</dt>
+                        <dd className="kv-value font-mono">
+                          {freeBays}/{totalBays}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="kv-term">Queue</dt>
+                        <dd className="kv-value font-mono">{queueLength} waiting</dd>
+                      </div>
+                      <div>
+                        <dt className="kv-term">Tariff</dt>
+                        <dd className="kv-value font-mono">
+                          {station.energy_price !== undefined
+                            ? `$${Number(station.energy_price).toFixed(3)}/kWh`
+                            : '—'}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className="kv-term">Charger types</span>
+                      {types.length === 0 ? (
+                        <span className="text-2xs text-slate-400">not reported</span>
+                      ) : (
+                        types.map((t) => (
+                          <span key={t} className="badge-slate font-mono">
+                            {t}
+                          </span>
+                        ))
+                      )}
+                      {station.operator_name && (
+                        <span className="ml-auto text-2xs text-slate-400">
+                          {station.operator_name}
+                        </span>
+                      )}
+                    </div>
                   </button>
-                </div>
-              )}
+                );
+              })}
             </div>
-          </div>
-        </div>
+          )}
+        </Section>
 
       </div>
+
+      <Section
+        title="How the search uses this data"
+        description="Stage 3 supplies the nodes and edge costs that stage 4 explores."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            [
+              'Nodes',
+              'Every operational station becomes a goal candidate; a faulted station is removed from the graph.'
+            ],
+            [
+              'Edge cost',
+              'Distances between positions are weighted together with waiting time and tariff into the step cost.'
+            ],
+            [
+              'Heuristic',
+              'Straight-line distance to the request destination is used as the admissible estimate for A* and greedy search.'
+            ]
+          ].map(([title, text]) => (
+            <div key={title} className="rounded-md border border-slate-200 p-3">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                <Zap className="h-3.5 w-3.5 text-blue-600" />
+                {title}
+              </p>
+              <p className="mt-1 text-2xs leading-relaxed text-slate-500">{text}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 flex items-start gap-1.5 text-2xs leading-relaxed text-slate-400">
+          <Compass className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            Station metadata is a static public-dataset snapshot shipped with the repository;
+            occupancy, queue state and faults are produced by the deterministic simulation. No
+            external map, geocoding or routing service is contacted.
+          </span>
+        </p>
+      </Section>
 
     </div>
   );
