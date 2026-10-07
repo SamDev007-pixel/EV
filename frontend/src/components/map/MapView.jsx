@@ -255,7 +255,7 @@ export default function MapView({
       });
 
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 10px; border: 1px solid #E2E8F0; font-size: 11px; min-width: 160px; border-radius: 6px;">
+        <div style="font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; padding: 10px; border: 1px solid #E2E8F0; font-size: 11px; min-width: 160px; border-radius: 6px;">
           <strong style="color: #1D4ED8; font-size: 12px; display: block; margin-bottom: 4px;">${st.name || st.id}</strong>
           <div style="color: #334155; margin-bottom: 2px;">Rated power: <strong>${powerKw !== null ? `${Number(powerKw).toFixed(0)} kW` : 'not reported'}</strong></div>
           <div style="color: #64748B; font-size: 10px;">Status: <span style="color: ${isFault ? '#DC2626' : '#047857'}">${status}</span></div>
@@ -407,7 +407,7 @@ export default function MapView({
 
       const marker = L.marker([lat, lng], { icon: userIcon }).addTo(userLocLayerRef.current);
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #A7F3D0; font-size: 11px; border-radius: 6px;">
+        <div style="font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #A7F3D0; font-size: 11px; border-radius: 6px;">
           <strong style="color: #34D399; display: block; margin-bottom: 2px;">Your Current Location</strong>
           <span>(${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E)</span>
         </div>
@@ -449,7 +449,7 @@ export default function MapView({
 
       const marker = L.marker([lat, lng], { icon: searchIcon }).addTo(searchedLocLayerRef.current);
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #BFDBFE; font-size: 11px; max-width: 220px; border-radius: 6px;">
+        <div style="font-family: 'Amazon Ember', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #BFDBFE; font-size: 11px; max-width: 220px; border-radius: 6px;">
           <strong style="color: #1D4ED8; display: block; margin-bottom: 2px;">${name || 'Searched Place'}</strong>
           <span style="color: #475569; font-size: 10px;">${display_name || ''}</span>
         </div>

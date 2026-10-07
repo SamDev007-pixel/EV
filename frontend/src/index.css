@@ -1,12 +1,14 @@
+@import './amazon-ember.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ==========================================================================
-   DESIGN SYSTEM - LIGHT DECISION-SUPPORT PLATFORM
+   DESIGN SYSTEM - LIGHT DECISION-SUPPORT PLATFORM (AWS THEME TYPOGRAPHY)
    --------------------------------------------------------------------------
-   Every page is built from the same primitives declared here, so headings,
-   cards, tables, stat tiles and states line up identically across screens.
+   Every page uses official AWS Amazon Ember for general UI and
+   Amazon Ember Mono for code, tabular figures, IDs, and metrics.
    ========================================================================== */
 
 :root {
@@ -31,6 +33,11 @@
   /* One spacing rhythm used by every page. */
   --gap-page: 1.5rem;
   --pad-card: 1.25rem;
+
+  /* Official AWS Font Tokens */
+  --font-family-base: "Amazon Ember", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono: "Amazon Ember Mono", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-family-display: "Amazon Ember Display", "Amazon Ember", sans-serif;
 }
 
 * {
@@ -45,14 +52,20 @@ html, body, #root {
   background-color: var(--bg-app);
   color: var(--text-main);
   min-height: 100vh;
+  font-family: var(--font-family-base);
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-family-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 0.875rem;
   line-height: 1.55;
+}
+
+/* Universal font enforcement: ensures no element escapes Amazon Ember */
+button, input, select, textarea, optgroup, p, span, div, a, label, table, th, td, h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-base);
 }
 
 /* The application is light-only; these guards stop a stray .dark class from any
@@ -64,16 +77,26 @@ html.dark, html.dark body, html.dark #root, html.dark main {
 
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-main);
+  font-family: var(--font-family-base);
   font-weight: 700;
   letter-spacing: -0.015em;
   line-height: 1.3;
 }
 
 /* Numbers, code and identifiers read as columns when they use tabular figures. */
-code, pre, kbd, samp, .font-mono {
-  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Consolas, monospace;
+code, pre, kbd, samp, .font-mono, .font-mono * {
+  font-family: var(--font-family-mono) !important;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
+}
+
+/* Leaflet map typography overrides */
+.leaflet-container,
+.leaflet-popup,
+.leaflet-popup-content,
+.leaflet-tooltip,
+.leaflet-control {
+  font-family: var(--font-family-base) !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -332,7 +355,7 @@ code, pre, kbd, samp, .font-mono {
 
 /* Identifier / code cells. */
 .ai-table .col-code {
-  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-family-mono) !important;
   font-size: 0.75rem;
   color: var(--text-subtle);
 }

@@ -45,7 +45,7 @@ def build_word_doc(md_filepath, output_filepaths):
     run_title.font.size = Pt(22)
     run_title.font.bold = True
     run_title.font.color.rgb = NAVY_COLOR
-    run_title.font.name = "Arial"
+    run_title.font.name = "Amazon Ember"
 
     p_sub = doc.add_paragraph()
     p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -53,7 +53,7 @@ def build_word_doc(md_filepath, output_filepaths):
     run_sub.font.size = Pt(13)
     run_sub.font.italic = True
     run_sub.font.color.rgb = BLUE_COLOR
-    run_sub.font.name = "Arial"
+    run_sub.font.name = "Amazon Ember"
 
     doc.add_paragraph()  # spacing
 
@@ -93,7 +93,7 @@ def build_word_doc(md_filepath, output_filepaths):
                     r.font.bold = True
                     r.font.color.rgb = RGBColor(255, 255, 255)
                     r.font.size = Pt(10)
-                    r.font.name = "Arial"
+                    r.font.name = "Amazon Ember"
 
         # Data rows formatting
         for row_idx, row_data in enumerate(data):
@@ -107,7 +107,7 @@ def build_word_doc(md_filepath, output_filepaths):
                         for r in p.runs:
                             r.font.size = Pt(9.5)
                             r.font.color.rgb = DARK_GRAY
-                            r.font.name = "Arial"
+                            r.font.name = "Amazon Ember"
 
         doc.add_paragraph()  # spacing after table
 
@@ -122,7 +122,7 @@ def build_word_doc(md_filepath, output_filepaths):
                 p_code.paragraph_format.left_indent = Inches(0.4)
                 p_code.paragraph_format.right_indent = Inches(0.4)
                 run_c = p_code.add_run("\n".join(code_lines))
-                run_c.font.name = "Consolas"
+                run_c.font.name = "Amazon Ember Mono"
                 run_c.font.size = Pt(9)
                 run_c.font.color.rgb = DARK_GRAY
                 code_lines = []
@@ -158,7 +158,7 @@ def build_word_doc(md_filepath, output_filepaths):
             run.font.size = Pt(16)
             run.font.bold = True
             run.font.color.rgb = NAVY_COLOR
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
             p.paragraph_format.space_before = Pt(12)
             p.paragraph_format.space_after = Pt(4)
 
@@ -168,7 +168,7 @@ def build_word_doc(md_filepath, output_filepaths):
             run.font.size = Pt(14)
             run.font.bold = True
             run.font.color.rgb = BLUE_COLOR
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
             p.paragraph_format.space_before = Pt(10)
             p.paragraph_format.space_after = Pt(4)
 
@@ -178,7 +178,7 @@ def build_word_doc(md_filepath, output_filepaths):
             run.font.size = Pt(12)
             run.font.bold = True
             run.font.color.rgb = NAVY_COLOR
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
             p.paragraph_format.space_before = Pt(8)
             p.paragraph_format.space_after = Pt(2)
 
@@ -189,21 +189,21 @@ def build_word_doc(md_filepath, output_filepaths):
             run.font.italic = True
             run.font.size = Pt(10)
             run.font.color.rgb = SLATE_GRAY
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
 
         elif raw.startswith("- ") or raw.startswith("* "):
             p = doc.add_paragraph(style='List Bullet')
             run = p.add_run(raw[2:].replace('**', ''))
             run.font.size = Pt(10.5)
             run.font.color.rgb = DARK_GRAY
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
 
         elif raw.startswith("1. ") or raw.startswith("2. ") or raw.startswith("3. ") or raw.startswith("4. ") or raw.startswith("5. ") or raw.startswith("6. "):
             p = doc.add_paragraph(style='List Number')
             run = p.add_run(raw[3:].replace('**', ''))
             run.font.size = Pt(10.5)
             run.font.color.rgb = DARK_GRAY
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
 
         elif raw.startswith("---"):
             p = doc.add_paragraph()
@@ -215,7 +215,7 @@ def build_word_doc(md_filepath, output_filepaths):
             run = p.add_run(raw.replace('**', ''))
             run.font.size = Pt(10.5)
             run.font.color.rgb = DARK_GRAY
-            run.font.name = "Arial"
+            run.font.name = "Amazon Ember"
             p.paragraph_format.space_after = Pt(4)
 
     if in_table:
