@@ -879,7 +879,6 @@ class PrimaryWorkflowEngine:
                 f"CSP backtracking (MRV/LCV/forward checking/AC-3) + forward/backward chaining"
                 + (" + Nash bargaining" if conflict_detected else "")
             ),
-            syllabus_unit="Units I-IV (agent, search, CSP, logic)",
             input_data={
                 "request": req.model_dump(),
                 "grid_load_kw": grid_load_kw,

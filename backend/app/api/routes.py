@@ -36,7 +36,7 @@ def api_health():
     return {
         "status": "healthy",
         "system": "Intelligent EV Charging & Resource Management System",
-        "ai_foundation": "Classical Artificial Intelligence (Units I-V)",
+        "ai_foundation": "Classical artificial intelligence: heuristic search, constraint satisfaction, logical inference and game theory",
         "simulation_time": sim_engine.current_tick_min,
         "stations_loaded": len(sim_engine.stations),
         "active_evs": len(sim_engine.evs)
@@ -396,7 +396,7 @@ def run_resolution_prove(req: ResolutionProveRequest):
 
     return {
         "input": req.model_dump(),
-        "algorithm": "Propositional Resolution Refutation Theorem Prover (FOAI Unit IV)",
+        "algorithm": "Propositional Resolution Refutation Theorem Prover",
         "result": result.model_dump(),
         "metrics": {
             "proved": result.proved,
@@ -546,8 +546,9 @@ class ProblemFormulationAPIRequest(BaseModel):
 @router.post("/problem/formulate")
 def formulate_problem_endpoint(req: ProblemFormulationAPIRequest):
     """
-    Unit I: Formal Problem Formulation API
-    Translates vehicle telematics into the formal AI 6-tuple: <S, s0, A, G, C, c>
+    Formal problem formulation API.
+
+    Translates a vehicle request into the formal 6-tuple <S, s0, A, G, C, c>.
     """
     from app.problem.formulation import ProblemFormulator, ProblemFormulationRequest
     cap = req.battery_capacity_kwh or 60.0
@@ -697,7 +698,7 @@ def run_and_or_search_plan(req: AndOrSearchRequest):
     res = engine.search(problem)
     return {
         "input": req.model_dump(),
-        "algorithm": "AND-OR Graph Search for Nondeterministic Contingency Planning (FOAI Unit II)",
+        "algorithm": "AND-OR Graph Search for Nondeterministic Contingency Planning",
         "result": res.model_dump(),
         "metrics": {
             "success": res.success,
@@ -720,7 +721,7 @@ def run_belief_state_search(req: BeliefSearchRequest):
     res = BeliefStateSearchEngine.solve_conformant_or_conditional(prob)
     return {
         "input": req.model_dump(),
-        "algorithm": "Belief-State Search in Partially Observable Environments (FOAI Unit II)",
+        "algorithm": "Belief-State Search in Partially Observable Environments",
         "result": res.model_dump(),
         "metrics": {
             "initial_belief_size": res.initial_belief_size,
@@ -745,7 +746,7 @@ def run_lrta_online_search(req: LRTASearchRequest):
     res = agent.run_online_search(start_node=req.start_node, goal_node=req.goal_node, max_steps=req.max_steps)
     return {
         "input": req.model_dump(),
-        "algorithm": "Learning Real-Time A* (LRTA*) Online Search Agent (FOAI Unit II)",
+        "algorithm": "Learning Real-Time A* (LRTA*) Online Search Agent",
         "result": res.model_dump(),
         "metrics": {
             "goal_reached": res.goal_reached,
@@ -945,7 +946,7 @@ def run_slot_competition_game(req: SlotCompetitionRequest):
     result = game.solve(SlotGameState(max_rounds=req.max_rounds))
     return {
         "input": req.model_dump(),
-        "algorithm": "Two-Agent EV Resource Competition with Minimax & Alpha-Beta Pruning (FOAI Unit III)",
+        "algorithm": "Two-Agent EV Resource Competition with Minimax & Alpha-Beta Pruning",
         "result": result.model_dump(),
         "metrics": {
             "minimax_utility": result.minimax_utility,
@@ -1016,12 +1017,12 @@ def get_evaluation_benchmark(seed: int = 42):
     return result.model_dump()
 
 
-# --- PEAS AGENT-ENVIRONMENT SPECIFICATION (FOAI UNIT I) ---
+# --- PEAS AGENT-ENVIRONMENT SPECIFICATION ---
 
 @router.get("/peas")
 def get_peas_specification():
     """
-    Unit I: PEAS description of the charging-coordinator agent.
+    PEAS description of the charging-coordinator agent.
 
     Returns the formal Performance / Environment / Actuators / Sensors specification
     together with the metrics that the running environment actually measures

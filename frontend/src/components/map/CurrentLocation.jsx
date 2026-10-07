@@ -63,27 +63,27 @@ export default function CurrentLocation({ onLocationFound }) {
         onClick={handleGetLocation}
         disabled={loading}
         title="Acquire current device location via browser Geolocation API"
-        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#162238] hover:bg-[#1E2D4A] active:bg-[#2563EB] text-[#38BDF8] hover:text-white border border-[#202F49] hover:border-[#38BDF8]/60 text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+        className="btn-secondary btn-sm"
       >
         {loading ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#38BDF8]" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <Crosshair className="w-3.5 h-3.5 text-[#38BDF8]" />
+          <Crosshair className="h-3.5 w-3.5" />
         )}
         <span>{loading ? 'Locating...' : 'Use My Location'}</span>
       </button>
 
       {errorMsg && (
-        <div className="max-w-xs text-[11px] text-rose-300 bg-[#2A1616] border border-rose-800 p-2 flex items-start gap-1.5 shadow-md">
-          <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+        <div className="banner banner--error max-w-xs text-2xs">
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
       {successCoords && (
-        <div className="text-[10px] font-mono text-emerald-300 bg-[#0E201B] border border-emerald-800 px-2 py-0.5 flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-          <span>Located: ({successCoords.lat.toFixed(4)}°, {successCoords.lng.toFixed(4)}°)</span>
+        <div className="badge-emerald font-mono">
+          <CheckCircle2 className="h-3 w-3" />
+          Located: ({successCoords.lat.toFixed(4)}°, {successCoords.lng.toFixed(4)}°)
         </div>
       )}
     </div>

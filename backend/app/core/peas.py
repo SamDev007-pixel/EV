@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 
 class PEASSpecification(BaseModel):
     """
-    PEAS description of the coordinator agent (FOAI Unit I).
+    PEAS description of the coordinator agent.
 
     HONESTY NOTE: this is a *software* agent. Its "sensors" are data feeds produced by the
     application itself - the request form, the simulation state and the knowledge base. No

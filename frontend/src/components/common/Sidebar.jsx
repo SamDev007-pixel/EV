@@ -10,129 +10,121 @@ import {
   Scale,
   HelpCircle,
   BarChart2,
-  GraduationCap,
   Menu,
-  ChevronRight,
   ShieldCheck
 } from 'lucide-react';
 
-export default function Sidebar({
-  activeTab,
-  onSelectTab,
-  isOpen = true,
-  onToggle,
-  onClose
-}) {
-  const navItems = [
-    { id: 'dashboard', label: '1. Dashboard', icon: LayoutDashboard, category: 'Overview' },
-    { id: 'ev_request', label: '2. EV Request', icon: FileEdit, category: 'Input & Formulation' },
-    { id: 'station_search', label: '3. Station Search', icon: Compass, category: 'Spatial & Reachability' },
-    { id: 'search_comparison', label: '4. AI Search Comparison', icon: GitCompare, category: 'Search Algorithms' },
-    { id: 'scheduling', label: '5. Smart Scheduling (CSP)', icon: Calendar, category: 'Constraint Satisfaction' },
-    { id: 'knowledge_logic', label: '6. Knowledge & Logic', icon: Brain, category: 'Knowledge Reasoning' },
-    { id: 'agents', label: '7. Agent System', icon: Users, category: 'Multi-Agent PEAS' },
-    { id: 'conflict_decision', label: '8. Conflict / Game Decision', icon: Scale, category: 'Game Theory' },
-    { id: 'explanation', label: '9. Decision Explanation', icon: HelpCircle, category: 'Explainable AI', badge: 'Core' },
-    { id: 'evaluation', label: '10. Evaluation', icon: BarChart2, category: 'Benchmarking' },
-    { id: 'syllabus', label: '11. FOAI Syllabus Mapping', icon: GraduationCap, category: 'Academic Reference', badge: 'Syllabus' }
-  ];
+const NAV_ITEMS = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, step: '01' },
+  { id: 'ev_request', label: 'EV Request', icon: FileEdit, step: '02' },
+  { id: 'station_search', label: 'Station Search', icon: Compass, step: '03' },
+  { id: 'search_comparison', label: 'Search Comparison', icon: GitCompare, step: '04' },
+  { id: 'scheduling', label: 'CSP Scheduling', icon: Calendar, step: '05' },
+  { id: 'knowledge_logic', label: 'Knowledge & Logic', icon: Brain, step: '06' },
+  { id: 'agents', label: 'Agent System', icon: Users, step: '07' },
+  { id: 'conflict_decision', label: 'Conflict Decision', icon: Scale, step: '08' },
+  { id: 'explanation', label: 'Decision Explanation', icon: HelpCircle, step: '09' },
+  { id: 'evaluation', label: 'Evaluation', icon: BarChart2, step: '10' }
+];
 
+/**
+ * Workflow navigation. The sidebar header is exactly the same height as the
+ * application header so the two chrome bars align on wide screens, and the nav
+ * items use one consistent row height and padding throughout.
+ */
+export default function Sidebar({ activeTab, onSelectTab, isOpen = true, onToggle, onClose }) {
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile backdrop */}
       {isOpen && (
         <div
           onClick={onClose || onToggle}
-          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+          aria-hidden="true"
         />
       )}
 
-      {/* Main Sidebar */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col justify-between bg-white border-r border-slate-200 transition-all duration-200 ease-in-out ${
-          isOpen ? 'w-64 xl:w-72 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-16'
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col border-r border-slate-200 bg-white transition-[width,transform] duration-200 ease-in-out ${
+          isOpen ? 'w-64 translate-x-0 xl:w-72' : '-translate-x-full lg:w-16 lg:translate-x-0'
         }`}
       >
-        {/* Top: Header */}
-        <div>
-          <div className="h-14 px-4 border-b border-slate-200 flex items-center justify-between">
-            {isOpen ? (
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  AI Navigation
-                </span>
-              </div>
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 mx-auto"></span>
-            )}
+        {/* Sidebar header - same h-16 as the application header */}
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 px-4">
+          {isOpen ? (
+            <span className="field-label !mb-0 text-slate-500">
+              Workflow
+            </span>
+          ) : (
+            <span className="mx-auto h-2 w-2 rounded-full bg-blue-600" />
+          )}
 
-            <button
-              onClick={onToggle}
-              title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded cursor-pointer transition-colors"
-              aria-label="Toggle Navigation"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Navigation Items List */}
-          <nav className="p-2 space-y-0.5 overflow-y-auto max-h-[calc(100vh-10rem)]">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    onSelectTab(item.id);
-                    if (window.innerWidth < 1024 && onClose) onClose();
-                  }}
-                  title={item.label}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-xs rounded-md transition-all cursor-pointer text-left ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-                    {isOpen && <span className="truncate">{item.label}</span>}
-                  </div>
-
-                  {isOpen && item.badge && (
-                    <span
-                      className={`px-1.5 py-0.5 text-[10px] rounded font-semibold shrink-0 ${
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label={isOpen ? 'Collapse navigation' : 'Expand navigation'}
+            title={isOpen ? 'Collapse navigation' : 'Expand navigation'}
+            className="btn-ghost btn-sm -mr-2 px-1.5"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* Bottom Academic Disclaimer & Methodology Card */}
+        {/* Navigation */}
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onSelectTab(item.id);
+                  if (window.innerWidth < 1024 && onClose) onClose();
+                }}
+                title={item.label}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex w-full items-center gap-3 rounded-md border px-3 py-2.5 text-left text-xs transition-colors ${
+                  isActive
+                    ? 'border-blue-200 bg-blue-50 font-semibold text-blue-700'
+                    : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                {isOpen && (
+                  <>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    <span
+                      className={`shrink-0 font-mono text-2xs ${
+                        isActive ? 'text-blue-500' : 'text-slate-300'
+                      }`}
+                    >
+                      {item.step}
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Footer note */}
         {isOpen ? (
-          <div className="p-3 m-2 border border-slate-200 rounded-lg bg-slate-50">
-            <div className="flex items-center gap-2 text-slate-800 text-[11px] font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-              <span>FOAI Academic Project</span>
+          <div className="m-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center gap-2 text-2xs font-bold text-slate-700">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+              <span>Decision Engine v1.0</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-              Classical Artificial Intelligence. Deterministic algorithms, formal logic & constraint satisfaction. Zero ML / Neural Networks.
+            <p className="mt-1 text-2xs leading-relaxed text-slate-500">
+              Deterministic classical AI: search, constraint satisfaction, logical inference and
+              game theory. No machine learning.
             </p>
           </div>
         ) : (
-          <div className="p-2 border-t border-slate-200 flex justify-center">
-            <ShieldCheck className="w-4 h-4 text-blue-600" title="Classical AI - FOAI" />
+          <div className="flex justify-center border-t border-slate-200 p-3">
+            <ShieldCheck className="h-4 w-4 text-blue-600" />
           </div>
         )}
       </aside>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapView, CurrentLocation } from '../map';
-import { Navigation, MapPin, Zap, CheckCircle2, Shield, Info } from 'lucide-react';
+import { Navigation, Zap, CheckCircle2, Shield, Info } from 'lucide-react';
+import { KeyValueGrid, StatTile } from '../common';
 
 /**
  * Station network map.
@@ -19,7 +20,7 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
 
-  const operationalCount = stations.filter((s) => s.operatingStatus === 'OPERATIONAL').length;
+  const operationalCount = stations.filter((s) => s.operating_status === 'OPERATIONAL').length;
   const totalChargers = stations.reduce((acc, s) => acc + (s.chargers?.length || 0), 0);
 
   const handleMapClick = ({ lat, lng }) => {
@@ -51,18 +52,17 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
   };
 
   return (
-    <div className="ai-card p-4 sm:p-5 space-y-4 font-sans">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center shrink-0 rounded-md">
-            <Navigation className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
-              Charging Network Map
-            </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Station coordinates from the local dataset snapshot; status and vehicle positions from the simulation.
+    <section className="ai-card section space-y-4 font-sans">
+      <div className="section-head">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500">
+            <Navigation className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="section-title">Charging network map</h3>
+            <p className="section-desc">
+              Station coordinates come from the local dataset snapshot; status and vehicle positions come
+              from the simulation.
             </p>
           </div>
         </div>
@@ -70,23 +70,11 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
       </div>
 
       {/* Measured counts, straight from the environment snapshot */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-        <div className="bg-slate-50 border border-slate-200 rounded-md py-2">
-          <div className="text-base font-bold text-slate-900">{stations.length}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Stations in dataset</div>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-md py-2">
-          <div className="text-base font-bold text-emerald-700">{operationalCount}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Operational now</div>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-md py-2">
-          <div className="text-base font-bold text-blue-700">{totalChargers}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Chargers modelled</div>
-        </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-md py-2">
-          <div className="text-base font-bold text-slate-900">{evs.length}</div>
-          <div className="text-[10px] uppercase tracking-wide text-slate-500">Vehicles in simulation</div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Stations in dataset" value={stations.length} size="sm" />
+        <StatTile label="Operational now" value={operationalCount} tone="success" size="sm" />
+        <StatTile label="Chargers modelled" value={totalChargers} tone="primary" size="sm" />
+        <StatTile label="Vehicles in simulation" value={evs.length} size="sm" />
       </div>
 
       <MapView
@@ -99,7 +87,7 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
         selectedNodeId={selectedNode?.id}
       />
 
-      <div className="flex items-center gap-3 text-[11px] text-slate-600 flex-wrap">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 bg-blue-700 border border-white rounded-sm" />
           <span>Charging station</span>
@@ -118,30 +106,47 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
             setCustomMarkers([]);
             setSelectedNode(null);
           }}
-          className="ml-auto text-[11px] font-medium text-slate-500 hover:text-slate-800 underline"
+          disabled={customMarkers.length === 0}
+          className="btn-ghost btn-sm ml-auto"
         >
           Clear user pins
         </button>
       </div>
 
       {selectedNode && (
-        <div className="bg-slate-50 border border-slate-200 rounded-md p-3 text-xs text-slate-700 space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-slate-900">{selectedNode.name}</span>
-            <button
-              type="button"
-              className="text-slate-400 hover:text-slate-700"
-              onClick={() => setSelectedNode(null)}
-            >
+        <div className="ai-card-flat space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-xs font-semibold text-slate-900">{selectedNode.name}</span>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setSelectedNode(null)}>
               Close
             </button>
           </div>
-          <div className="font-mono text-[11px] text-slate-600">
-            lat {(selectedNode.lat ?? selectedNode.latitude)?.toFixed?.(4) ?? '—'}, lng{' '}
-            {(selectedNode.lng ?? selectedNode.longitude)?.toFixed?.(4) ?? '—'}
-          </div>
+          <KeyValueGrid
+            columns={2}
+            items={[
+              {
+                term: 'Coordinates',
+                value: `${(selectedNode.lat ?? selectedNode.latitude)?.toFixed?.(4) ?? '—'}, ${
+                  (selectedNode.lng ?? selectedNode.longitude)?.toFixed?.(4) ?? '—'
+                }`,
+                mono: true,
+              },
+              ...(selectedNode.accuracy !== undefined
+                ? [
+                    {
+                      term: 'Reported accuracy',
+                      value:
+                        typeof selectedNode.accuracy === 'number'
+                          ? `${selectedNode.accuracy.toFixed(0)} m`
+                          : String(selectedNode.accuracy),
+                      mono: true,
+                    },
+                  ]
+                : []),
+            ]}
+          />
           {selectedNode.isCustomPin && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-xs text-slate-500">
               User pin created in the browser; it is not stored on the server.
             </p>
           )}
@@ -149,46 +154,46 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
       )}
 
       {/* Station table: the same source of truth the search algorithms read */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+      <div className="ai-table-container">
+        <table className="ai-table">
           <thead>
-            <tr className="text-left text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-200">
-              <th className="py-2 pr-3">Station</th>
-              <th className="py-2 pr-3">Operator</th>
-              <th className="py-2 pr-3">Power</th>
-              <th className="py-2 pr-3">Chargers</th>
-              <th className="py-2 pr-3">Price</th>
-              <th className="py-2 pr-3">Status</th>
+            <tr>
+              <th>Station</th>
+              <th>Operator</th>
+              <th className="num">Power</th>
+              <th className="num">Chargers free</th>
+              <th className="num">Tariff</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {stations.map((s) => {
-              const available = (s.chargers || []).filter((c) => c.currentStatus === 'AVAILABLE').length;
+            {stations.map((st) => {
+              const available = (st.chargers || []).filter((c) => c.current_status === 'AVAILABLE').length;
               return (
-                <tr key={s.id} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 pr-3">
-                    <div className="font-medium text-slate-900">{s.name}</div>
-                    <div className="font-mono text-[10px] text-slate-400">{s.id}</div>
+                <tr key={st.id}>
+                  <td>
+                    <div className="font-medium text-slate-900">{st.name}</div>
+                    <div className="col-code">{st.id}</div>
                   </td>
-                  <td className="py-2 pr-3 text-slate-600">{s.operatorName || '—'}</td>
-                  <td className="py-2 pr-3 text-slate-600">{s.chargingPower ? `${s.chargingPower} kW` : '—'}</td>
-                  <td className="py-2 pr-3 text-slate-600">
+                  <td className="text-slate-600">{st.operator_name || '—'}</td>
+                  <td className="num">{st.charging_power ? `${Number(st.charging_power).toFixed(0)} kW` : '—'}</td>
+                  <td className="num">
                     <span className="inline-flex items-center gap-1">
-                      <Zap className="w-3 h-3 text-blue-600" />
-                      {available}/{s.chargers?.length || 0} free
+                      <Zap className="h-3 w-3 text-blue-600" />
+                      {available}/{st.chargers?.length || 0}
                     </span>
                   </td>
-                  <td className="py-2 pr-3 text-slate-600">
-                    {typeof s.energyPrice === 'number' ? `$${s.energyPrice.toFixed(3)}/kWh` : '—'}
+                  <td className="num">
+                    {typeof st.energy_price === 'number' ? `$${Number(st.energy_price).toFixed(3)}/kWh` : '—'}
                   </td>
-                  <td className="py-2 pr-3">
-                    {s.operatingStatus === 'OPERATIONAL' ? (
-                      <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
-                        <CheckCircle2 className="w-3 h-3" /> Operational
+                  <td>
+                    {st.operating_status === 'OPERATIONAL' ? (
+                      <span className="badge-emerald">
+                        <CheckCircle2 className="h-3 w-3" /> Operational
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-rose-700 font-medium">
-                        <Shield className="w-3 h-3" /> {s.operatingStatus}
+                      <span className="badge-rose">
+                        <Shield className="h-3 w-3" /> {st.operating_status}
                       </span>
                     )}
                   </td>
@@ -199,11 +204,11 @@ export default function LiveNetworkMap({ stations = [], evs = [] }) {
         </table>
       </div>
 
-      <p className="text-[11px] text-slate-500 flex items-start gap-1.5">
-        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+      <p className="flex items-start gap-2 text-xs text-slate-500">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
         Station metadata is a static public-dataset snapshot (location, operator, ports, published tariff).
         Occupancy, faults and vehicle positions are simulated. No external map, geocoding or routing API is called.
       </p>
-    </div>
+    </section>
   );
 }

@@ -3,106 +3,281 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   ACADEMIC AI DECISION-SUPPORT PLATFORM - CLEAN LIGHT THEME DESIGN SYSTEM
-   FOAI Subject: Intelligent EV Charging & Resource Management System
+   DESIGN SYSTEM - LIGHT DECISION-SUPPORT PLATFORM
+   --------------------------------------------------------------------------
+   Every page is built from the same primitives declared here, so headings,
+   cards, tables, stat tiles and states line up identically across screens.
    ========================================================================== */
 
 :root {
-  --bg-app: #F8FAFC;
+  --bg-app: #F6F8FB;
   --bg-card: #FFFFFF;
   --bg-subtle: #F1F5F9;
   --border-card: #E2E8F0;
   --border-strong: #CBD5E1;
   --text-main: #0F172A;
-  --text-muted: #64748B;
-  --text-subtle: #94A3B8;
-  --primary-blue: #2563EB;
+  --text-muted: #475569;
+  --text-subtle: #64748B;
+  --text-faint: #94A3B8;
+  --primary: #2563EB;
   --primary-hover: #1D4ED8;
+  --primary-soft: #EFF6FF;
   --accent-teal: #0D9488;
   --accent-sky: #0284C7;
   --accent-emerald: #059669;
   --accent-amber: #D97706;
   --accent-crimson: #DC2626;
+
+  /* One spacing rhythm used by every page. */
+  --gap-page: 1.5rem;
+  --pad-card: 1.25rem;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 html, body, #root {
-  background-color: #F8FAFC !important;
-  color: #0F172A !important;
+  background-color: var(--bg-app);
+  color: var(--text-main);
   min-height: 100vh;
-  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
-/* Clear Dark Theme Overrides */
+/* The application is light-only; these guards stop a stray .dark class from any
+   cached markup repainting the interface. */
 html.dark, html.dark body, html.dark #root, html.dark main {
-  background-color: #F8FAFC !important;
-  color: #0F172A !important;
+  background-color: var(--bg-app);
+  color: var(--text-main);
 }
 
-/* Clean Professional Typography */
 h1, h2, h3, h4, h5, h6 {
-  color: #0F172A;
+  color: var(--text-main);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
 }
 
-/* Monospace & Tabular Numbers for Algorithms and Math */
-code, pre, .font-mono, [class*="font-mono"] {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', Menlo, monospace !important;
+/* Numbers, code and identifiers read as columns when they use tabular figures. */
+code, pre, kbd, samp, .font-mono {
+  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
 }
 
-/* Crisp Clean Card Utilities */
+/* --------------------------------------------------------------------------
+   1. PAGE SKELETON
+   -------------------------------------------------------------------------- */
+
+/* Vertical rhythm wrapper. Use as the single root element of every page. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-page);
+  width: 100%;
+}
+
+/* Page header: identical block at the top of every screen. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-card);
+}
+
+.page-head__text {
+  min-width: 0;
+  max-width: 78ch;
+}
+
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.page-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.page-subtitle {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-subtle);
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* --------------------------------------------------------------------------
+   2. CARDS & SECTIONS
+   -------------------------------------------------------------------------- */
+
 .ai-card {
-  background-color: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ai-card:hover {
-  border-color: #CBD5E1;
-  box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04), 0 1px 3px 0 rgba(15, 23, 42, 0.06);
 }
 
 .ai-card-flat {
-  background-color: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 0.5rem;
 }
 
 .ai-card-subtle {
-  background-color: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: 0.375rem;
 }
 
-/* Backward compatibility for existing components using .glass-panel */
-.glass-panel {
-  background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
-  border-radius: 8px !important;
-  color: #0F172A !important;
+.section {
+  padding: var(--pad-card);
 }
 
-.glass-panel-hover:hover {
-  border-color: #93C5FD !important;
-  box-shadow: 0 4px 12px 0 rgba(37, 99, 235, 0.08) !important;
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.875rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-card);
 }
 
-/* Table Utilities */
+.section-head:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.section-desc {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-subtle);
+}
+
+/* Small uppercase label above a group of fields. */
+.field-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 0.375rem;
+}
+
+/* --------------------------------------------------------------------------
+   3. STAT TILES
+   -------------------------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.25rem;
+  min-height: 5.25rem;
+  padding: 0.875rem 1rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 0.5rem;
+}
+
+.stat-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.stat-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-main);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value--sm { font-size: 1.0625rem; }
+
+.stat-unit {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+  margin-left: 0.1875rem;
+}
+
+.stat-hint {
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   4. TABLES
+   -------------------------------------------------------------------------- */
+
 .ai-table-container {
   overflow-x: auto;
-  border: 1px solid #E2E8F0;
-  border-radius: 6px;
-  background-color: #FFFFFF;
+  border: 1px solid var(--border-card);
+  border-radius: 0.5rem;
+  background-color: var(--bg-card);
 }
 
 .ai-table {
@@ -112,191 +287,384 @@ code, pre, .font-mono, [class*="font-mono"] {
   font-size: 0.8125rem;
 }
 
-.ai-table th {
-  background-color: #F8FAFC;
-  color: #475569;
-  font-weight: 600;
+.ai-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 1px solid var(--border-card);
   white-space: nowrap;
+  vertical-align: middle;
 }
 
-.ai-table td {
-  padding: 0.625rem 0.875rem;
-  border-bottom: 1px solid #F1F5F9;
+.ai-table tbody td {
+  padding: 0.6875rem 0.875rem;
+  border-bottom: 1px solid #EEF2F7;
   color: #1E293B;
+  vertical-align: middle;
 }
 
-.ai-table tr:last-child td {
+.ai-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.ai-table tr:hover td {
-  background-color: #F8FAFC;
+.ai-table tbody tr:hover td {
+  background-color: #FAFCFE;
 }
 
-/* Badges */
-.badge-blue {
-  background-color: #EFF6FF;
-  color: #1D4ED8;
-  border: 1px solid #BFDBFE;
+/* Numeric columns: right aligned with tabular figures so digits form columns. */
+.ai-table .num,
+.ai-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ai-table .col-center,
+.ai-table th.col-center {
+  text-align: center;
+}
+
+/* Identifier / code cells. */
+.ai-table .col-code {
+  font-family: 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
   font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  color: var(--text-subtle);
 }
 
-.badge-teal {
-  background-color: #F0FDFA;
-  color: #0F766E;
-  border: 1px solid #99F6E4;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+/* Strong emphasis on the selected / highlighted row. */
+.ai-table tbody tr.row-selected td {
+  background-color: var(--primary-soft);
 }
 
-.badge-emerald {
-  background-color: #ECFDF5;
-  color: #047857;
-  border: 1px solid #A7F3D0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+.ai-table tbody tr.row-selected td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--primary);
 }
 
-.badge-amber {
-  background-color: #FFFBEB;
-  color: #B45309;
-  border: 1px solid #FDE68A;
-  font-size: 0.75rem;
+/* --------------------------------------------------------------------------
+   5. BADGES & PILLS
+   -------------------------------------------------------------------------- */
+
+.badge-blue, .badge-teal, .badge-emerald, .badge-amber, .badge-rose,
+.badge-slate, .badge-violet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
+  line-height: 1;
+  padding: 0.3125rem 0.5rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
 }
 
-.badge-rose {
-  background-color: #FFF1F2;
-  color: #BE123C;
-  border: 1px solid #FECDD3;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-}
+.badge-blue   { background-color: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.badge-teal   { background-color: #F0FDFA; color: #0F766E; border: 1px solid #99F6E4; }
+.badge-emerald{ background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+.badge-amber  { background-color: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+.badge-rose   { background-color: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
+.badge-slate  { background-color: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+.badge-violet { background-color: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
 
-.badge-slate {
-  background-color: #F1F5F9;
-  color: #475569;
-  border: 1px solid #E2E8F0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-}
+/* --------------------------------------------------------------------------
+   6. BUTTONS
+   -------------------------------------------------------------------------- */
 
-/* Buttons */
-.btn-primary {
-  background-color: #2563EB;
-  color: #FFFFFF;
+.btn-primary, .btn-secondary, .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-height: 2.25rem;
+  padding: 0 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  border: 1px solid #1D4ED8;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  transition: all 0.15s ease;
+  line-height: 1;
+  border-radius: 0.375rem;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
 }
 
-.btn-primary:hover {
-  background-color: #1D4ED8;
+.btn-primary {
+  background-color: var(--primary);
+  color: #FFFFFF;
+  border: 1px solid var(--primary-hover);
 }
+.btn-primary:hover { background-color: var(--primary-hover); }
 
 .btn-secondary {
   background-color: #FFFFFF;
   color: #334155;
-  font-weight: 600;
-  border: 1px solid #CBD5E1;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  transition: all 0.15s ease;
-  cursor: pointer;
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover { background-color: var(--bg-subtle); border-color: #94A3B8; color: var(--text-main); }
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--text-subtle);
+  border: 1px solid transparent;
+}
+.btn-ghost:hover { background-color: var(--bg-subtle); color: var(--text-main); }
+
+/* Compact variant, for toolbars and table row actions. */
+.btn-sm {
+  min-height: 1.875rem;
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
+  border-radius: 0.3125rem;
 }
 
-.btn-secondary:hover {
-  background-color: #F8FAFC;
-  border-color: #94A3B8;
-  color: #0F172A;
+.btn-primary:disabled, .btn-secondary:disabled, .btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
-/* Form Controls */
+.btn-primary:focus-visible, .btn-secondary:focus-visible,
+.btn-ghost:focus-visible, .form-input:focus-visible, .tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   7. FORM CONTROLS
+   -------------------------------------------------------------------------- */
+
 .form-input {
+  display: block;
   width: 100%;
+  min-height: 2.25rem;
   background-color: #FFFFFF;
-  border: 1px solid #CBD5E1;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  color: #0F172A;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.375rem;
+  padding: 0.4375rem 0.6875rem;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  color: var(--text-main);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #3B82F6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.form-input:disabled {
+  background-color: var(--bg-subtle);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.form-input::placeholder { color: var(--text-faint); }
+
+select.form-input {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.9rem;
 }
 
 .form-label {
   display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+  margin-bottom: 0.3125rem;
+}
+
+.form-hint {
+  margin-top: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--text-faint);
+}
+
+/* Field grid used by the request form and other input screens. */
+.form-grid {
+  display: grid;
+  gap: 0.875rem 1rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* --------------------------------------------------------------------------
+   8. TOOLBAR & TABS
+   -------------------------------------------------------------------------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toolbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-card);
+  border-radius: 0.5rem;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  margin-bottom: 0.375rem;
+  color: var(--text-subtle);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.3125rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Minimal Clean Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.tab:hover { color: var(--text-main); background-color: rgba(255, 255, 255, 0.7); }
+
+.tab[aria-selected='true'] {
+  background-color: #FFFFFF;
+  color: var(--primary-hover);
+  border-color: var(--border-card);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
 }
 
-::-webkit-scrollbar-track {
-  background: #F1F5F9;
-}
+/* --------------------------------------------------------------------------
+   9. STATES (loading / empty / error / info)
+   -------------------------------------------------------------------------- */
 
-::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
-}
-
-/* Leaflet Map & Light Popup Styling */
-.leaflet-container {
-  background-color: #E2E8F0 !important;
-  font-family: inherit !important;
-  border-radius: 6px;
-}
-
-.leaflet-popup-content-wrapper {
-  background: #FFFFFF !important;
-  color: #0F172A !important;
-  border: 1px solid #CBD5E1 !important;
-  border-radius: 6px !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
-  padding: 0 !important;
-}
-
-.leaflet-popup-content {
-  margin: 0 !important;
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: var(--text-subtle);
   font-size: 0.8125rem;
 }
 
-.leaflet-popup-tip {
-  background: #FFFFFF !important;
+.state__title { font-weight: 600; color: var(--text-main); }
+.state__detail { font-size: 0.75rem; color: var(--text-faint); max-width: 60ch; }
+
+/* Inline banner for errors and notices, aligned with card padding. */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  border: 1px solid;
+}
+
+.banner--error { background-color: #FFF1F2; border-color: #FECDD3; color: #9F1239; }
+.banner--warn  { background-color: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+.banner--info  { background-color: #EFF6FF; border-color: #BFDBFE; color: #1E40AF; }
+.banner--ok    { background-color: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+
+/* --------------------------------------------------------------------------
+   10. KEY/VALUE LISTS & PROGRESS
+   -------------------------------------------------------------------------- */
+
+.kv-grid {
+  display: grid;
+  gap: 0.75rem 1.25rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .kv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.kv-term {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.kv-value {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.bar {
+  width: 100%;
+  height: 0.375rem;
+  background-color: #E2E8F0;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  transition: width 0.3s ease;
+}
+
+/* --------------------------------------------------------------------------
+   11. SCROLLBARS & LEAFLET
+   -------------------------------------------------------------------------- */
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-subtle); }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+.leaflet-container {
+  background-color: #E2E8F0;
+  font-family: inherit;
+  border-radius: 0.5rem;
+  width: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF;
+  color: var(--text-main);
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.12);
+  padding: 0;
+}
+
+.leaflet-popup-content { margin: 0; font-size: 0.8125rem; }
+.leaflet-popup-tip { background: #FFFFFF; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

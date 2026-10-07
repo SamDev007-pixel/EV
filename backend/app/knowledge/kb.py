@@ -11,7 +11,7 @@ class KnowledgeBase:
         self._initialize_default_rules()
 
     def _initialize_default_rules(self):
-        """Populate classical AI rule base (Units I-IV logical reasoning)."""
+        """Populate the classical-AI rule base used for logical reasoning."""
         self.rules = [
             # Rule 1: IF EV is emergency THEN chargingPriority = CRITICAL
             Rule(

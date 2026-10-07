@@ -14,9 +14,9 @@ const TILE_PRESETS = {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
     }
   },
-  carto_dark: {
-    name: 'CartoDB Dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  carto_light: {
+    name: 'CARTO light',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
     options: {
       maxZoom: 19,
       subdomains: ['a', 'b', 'c', 'd'],
@@ -201,34 +201,34 @@ export default function MapView({
         bengaluruBounds.push([lat, lng]);
       }
 
-      const status = st.operatingStatus || st.status || st.operating_status || 'OPERATIONAL';
+      const status = st.operating_status || 'OPERATIONAL';
       const isFault = status === 'FAULT';
       const isSelected = selectedNodeId === st.id;
       const rawName = st.name || st.id;
       const stationName = rawName.length > 24 ? rawName.substring(0, 22) + '...' : rawName;
-      const powerKw = st.charging_power_kw || st.chargingPower || st.charging_power || 60;
+      const powerKw = st.charging_power ?? null;
 
       // High-visibility SVG pin with charging symbol
       const pinColor = isFault ? '#EF4444' : isSelected ? '#2563EB' : '#1D4ED8';
-      const borderColor = isSelected ? '#FFFFFF' : '#0B101B';
+      const borderColor = '#FFFFFF';
 
       const iconHtml = `
         <div class="relative group cursor-pointer flex flex-col items-center">
-          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5)); transform: ${isSelected ? 'scale(1.2)' : 'scale(1)'}; transition: transform 0.15s ease;">
+          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 3px rgba(15,23,42,0.25)); transform: ${isSelected ? 'scale(1.2)' : 'scale(1)'}; transition: transform 0.15s ease;">
             <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="${pinColor}" stroke="${borderColor}" stroke-width="2"/>
             <circle cx="14" cy="14" r="8" fill="#FFFFFF"/>
             <path d="M14.8 8.5L10.5 14.5H14L13.2 19.5L17.5 13.5H14L14.8 8.5Z" fill="${isFault ? '#EF4444' : '#1D4ED8'}"/>
           </svg>
 
           <!-- Label badge -->
-          <div class="mt-0.5 px-1.5 py-0.2 bg-[#0B101B] border border-[#202F49] text-white text-[9px] font-mono whitespace-nowrap shadow-lg">
+          <div class="mt-0.5 px-1.5 py-0.5 bg-white border border-slate-300 text-slate-700 text-2xs font-mono whitespace-nowrap shadow-sm">
             ${st.id.replace('STATION-', '').replace('CS-', '')}
           </div>
 
           <!-- Tooltip on hover -->
-          <div class="absolute bottom-10 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col gap-0.5 px-2.5 py-1 bg-[#0B101B] text-white border border-[#202F49] text-[10px] font-mono whitespace-nowrap shadow-2xl z-50 pointer-events-none">
-            <strong class="text-[#38BDF8]">${stationName}</strong>
-            <span class="text-slate-300">Power: ${powerKw} kW • Status: ${status}</span>
+          <div class="absolute bottom-10 left-1/2 -translate-x-1/2 hidden group-hover:flex flex-col gap-0.5 px-2.5 py-1 bg-white text-slate-700 border border-slate-300 text-2xs font-mono whitespace-nowrap shadow-lg z-50 pointer-events-none">
+            <strong class="text-blue-700">${stationName}</strong>
+            <span class="text-slate-500">Power: ${powerKw} kW • Status: ${status}</span>
           </div>
         </div>
       `;
@@ -255,11 +255,11 @@ export default function MapView({
       });
 
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #fff; background: #0B101B; padding: 10px; border: 1px solid #202F49; font-size: 11px; min-width: 160px;">
-          <strong style="color: #38BDF8; font-size: 12px; display: block; margin-bottom: 4px;">${st.name || st.id}</strong>
-          <div style="color: #E2E8F0; margin-bottom: 2px;">⚡ Rated Power: <strong>${powerKw} kW</strong></div>
-          <div style="color: #94A3B8; font-size: 10px;">Status: <span style="color: ${isFault ? '#F87171' : '#34D399'}">${status}</span></div>
-          <div style="color: #94A3B8; font-size: 10px; margin-top: 4px;">(${lat.toFixed(4)}°, ${lng.toFixed(4)}°)</div>
+        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 10px; border: 1px solid #E2E8F0; font-size: 11px; min-width: 160px; border-radius: 6px;">
+          <strong style="color: #1D4ED8; font-size: 12px; display: block; margin-bottom: 4px;">${st.name || st.id}</strong>
+          <div style="color: #334155; margin-bottom: 2px;">Rated power: <strong>${powerKw !== null ? `${Number(powerKw).toFixed(0)} kW` : 'not reported'}</strong></div>
+          <div style="color: #64748B; font-size: 10px;">Status: <span style="color: ${isFault ? '#DC2626' : '#047857'}">${status}</span></div>
+          <div style="color: #64748B; font-size: 10px; margin-top: 4px;">(${lat.toFixed(4)}°, ${lng.toFixed(4)}°)</div>
         </div>
       `);
     });
@@ -298,22 +298,22 @@ export default function MapView({
       const isCharging = ev.status === 'CHARGING';
       const isSelected = selectedNodeId === ev.id;
 
-      let badgeBg = 'bg-[#131B2B] text-[#38BDF8] border-[#202F49]';
+      let badgeBg = 'bg-white text-blue-700 border-slate-300';
       let displayId = ev.id.replace('EV-', 'EV');
 
       if (isEmergency) {
-        badgeBg = 'bg-rose-950 text-rose-200 border-rose-600 animate-pulse';
+        badgeBg = 'bg-rose-100 text-rose-800 border-rose-400';
         displayId = '108-EMG';
       } else if (isCharging) {
-        badgeBg = 'bg-[#1D4ED8] text-white border-[#3B82F6]';
+        badgeBg = 'bg-blue-600 text-white border-blue-700';
       }
 
       if (isSelected) {
-        badgeBg += ' ring-2 ring-white scale-110';
+        badgeBg += ' ring-2 ring-blue-500 scale-110';
       }
 
       const evIconHtml = `
-        <div class="px-2 py-0.5 border ${badgeBg} font-mono text-[9px] font-bold flex items-center justify-center shadow-xl whitespace-nowrap cursor-pointer hover:scale-110 transition-transform">
+        <div class="px-2 py-0.5 border ${badgeBg} font-mono text-2xs font-bold flex items-center justify-center shadow-sm whitespace-nowrap cursor-pointer hover:scale-110 transition-transform">
           🚗 ${displayId}
         </div>
       `;
@@ -349,11 +349,11 @@ export default function MapView({
     customMarkers.forEach((pin) => {
       const pinIconHtml = `
         <div class="relative cursor-pointer group flex flex-col items-center">
-          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));">
+          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 3px rgba(15,23,42,0.25));">
             <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="#F59E0B" stroke="#FFFFFF" stroke-width="2"/>
-            <circle cx="14" cy="14" r="6" fill="#0B101B"/>
+            <circle cx="14" cy="14" r="6" fill="#FFFFFF"/>
           </svg>
-          <div class="mt-0.5 px-1.5 py-0.2 bg-[#0B101B] border border-amber-500 text-amber-300 font-mono text-[9px] whitespace-nowrap">
+          <div class="mt-0.5 px-1.5 py-0.5 bg-white border border-amber-400 text-amber-700 font-mono text-2xs whitespace-nowrap">
             ${pin.name || 'Pinned Point'}
           </div>
         </div>
@@ -407,7 +407,7 @@ export default function MapView({
 
       const marker = L.marker([lat, lng], { icon: userIcon }).addTo(userLocLayerRef.current);
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #fff; background: #0B101B; padding: 8px; border: 1px solid #10B981; font-size: 11px;">
+        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #A7F3D0; font-size: 11px; border-radius: 6px;">
           <strong style="color: #34D399; display: block; margin-bottom: 2px;">Your Current Location</strong>
           <span>(${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E)</span>
         </div>
@@ -429,12 +429,12 @@ export default function MapView({
 
       const searchIconHtml = `
         <div class="relative flex flex-col items-center">
-          <svg width="32" height="38" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 8px rgba(37,99,235,0.7));">
+          <svg width="32" height="38" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(37,99,235,0.35));">
             <path d="M14 0C6.268 0 0 6.268 0 14C0 24.5 14 34 14 34C14 34 28 24.5 28 14C28 6.268 21.732 0 14 0Z" fill="#3B82F6" stroke="#FFFFFF" stroke-width="2"/>
             <circle cx="14" cy="14" r="7" fill="#FFFFFF"/>
             <text x="14" y="18" font-size="10" text-anchor="middle" fill="#1D4ED8" font-weight="bold">📍</text>
           </svg>
-          <div class="mt-0.5 px-2 py-0.5 bg-[#0B101B] border border-[#3B82F6] text-[#38BDF8] font-mono text-[9px] whitespace-nowrap shadow-lg">
+          <div class="mt-0.5 px-2 py-0.5 bg-white border border-blue-400 text-blue-700 font-mono text-2xs whitespace-nowrap shadow-sm">
             ${name || 'Searched Location'}
           </div>
         </div>
@@ -449,9 +449,9 @@ export default function MapView({
 
       const marker = L.marker([lat, lng], { icon: searchIcon }).addTo(searchedLocLayerRef.current);
       marker.bindPopup(`
-        <div style="font-family: sans-serif; color: #fff; background: #0B101B; padding: 8px; border: 1px solid #3B82F6; font-size: 11px; max-width: 220px;">
-          <strong style="color: #38BDF8; display: block; margin-bottom: 2px;">${name || 'Searched Place'}</strong>
-          <span style="color: #CBD5E1; font-size: 10px;">${display_name || ''}</span>
+        <div style="font-family: sans-serif; color: #0F172A; background: #FFFFFF; padding: 8px; border: 1px solid #BFDBFE; font-size: 11px; max-width: 220px; border-radius: 6px;">
+          <strong style="color: #1D4ED8; display: block; margin-bottom: 2px;">${name || 'Searched Place'}</strong>
+          <span style="color: #475569; font-size: 10px;">${display_name || ''}</span>
         </div>
       `).openPopup();
 
@@ -471,27 +471,27 @@ export default function MapView({
 
       const category = poi.category || 'place';
       let iconEmoji = '📍';
-      let badgeColor = 'bg-[#1E293B] text-slate-300 border-slate-700';
+      let badgeColor = 'bg-white text-slate-600 border-slate-300';
 
       if (category.includes('charging')) {
         iconEmoji = '⚡';
-        badgeColor = 'bg-blue-950 text-blue-300 border-blue-700';
+        badgeColor = 'bg-blue-50 text-blue-700 border-blue-300';
       } else if (category.includes('hospital')) {
         iconEmoji = '🏥';
-        badgeColor = 'bg-rose-950 text-rose-300 border-rose-700';
+        badgeColor = 'bg-rose-50 text-rose-700 border-rose-300';
       } else if (category.includes('parking')) {
         iconEmoji = '🅿️';
-        badgeColor = 'bg-indigo-950 text-indigo-300 border-indigo-700';
+        badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-300';
       } else if (category.includes('bus') || category.includes('transit') || category.includes('subway')) {
         iconEmoji = '🚌';
-        badgeColor = 'bg-amber-950 text-amber-300 border-amber-700';
+        badgeColor = 'bg-amber-50 text-amber-700 border-amber-300';
       } else if (category.includes('restaurant') || category.includes('cafe')) {
         iconEmoji = '☕';
-        badgeColor = 'bg-emerald-950 text-emerald-300 border-emerald-700';
+        badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-300';
       }
 
       const poiIconHtml = `
-        <div class="w-6 h-6 rounded-full ${badgeColor} border text-[11px] flex items-center justify-center shadow-lg cursor-pointer hover:scale-125 transition-transform" title="${poi.name} (${category})">
+        <div class="w-6 h-6 rounded-full ${badgeColor} border text-2xs flex items-center justify-center shadow-sm cursor-pointer hover:scale-125 transition-transform" title="${poi.name} (${category})">
           ${iconEmoji}
         </div>
       `;
@@ -526,16 +526,16 @@ export default function MapView({
     if (activeRoute && activeRoute.coordinates && activeRoute.coordinates.length > 0) {
       // Glow underlay polyline
       L.polyline(activeRoute.coordinates, {
-        color: '#1D4ED8',
+        color: '#93C5FD',
         weight: 8,
-        opacity: 0.5,
+        opacity: 0.6,
         lineCap: 'round',
         lineJoin: 'round'
       }).addTo(routeLayerRef.current);
 
       // Core crisp polyline
       const polyline = L.polyline(activeRoute.coordinates, {
-        color: '#38BDF8',
+        color: '#2563EB',
         weight: 4,
         opacity: 1.0,
         lineCap: 'round',
@@ -566,18 +566,18 @@ export default function MapView({
   };
 
   return (
-    <div className="relative w-full border border-[#202F49] overflow-hidden shadow-2xl bg-[#0B101B]">
+    <div className="relative w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
       {/* Tile Switcher Controls Overlay */}
-      <div className="absolute top-3 right-3 z-[1000] flex items-center gap-1.5 bg-[#0B101B]/90 backdrop-blur-md border border-[#202F49] p-1 shadow-xl">
+      <div className="absolute right-3 top-3 z-[1000] flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 p-1 shadow-sm">
         {Object.keys(TILE_PRESETS).map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setActiveTileKey(key)}
-            className={`px-2.5 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-2xs font-semibold transition-all cursor-pointer ${
               activeTileKey === key
-                ? 'bg-gradient-to-r from-[#1D4ED8] to-[#2563EB] text-white border border-[#3B82F6] shadow-sm'
-                : 'text-slate-300 hover:text-white hover:bg-[#1E2D4A] border border-transparent'
+                ? 'bg-blue-600 text-white border border-blue-700'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent'
             }`}
           >
             {TILE_PRESETS[key].name}
@@ -587,23 +587,23 @@ export default function MapView({
         <button
           type="button"
           onClick={handleResetView}
-          title="Reset map view to Bengaluru Center"
-          className="p-1 text-slate-300 hover:text-white hover:bg-[#1E2D4A] border border-transparent hover:border-[#202F49] ml-1 transition-colors cursor-pointer"
+          title="Reset map view to the default centre"
+          className="btn-ghost btn-sm ml-0.5 px-1.5"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {/* Map Hint / Status Notice */}
-      <div className="absolute bottom-2 left-3 z-[1000] hidden sm:flex items-center gap-2 px-2.5 py-1 bg-[#0B101B]/90 backdrop-blur-md border border-[#202F49] text-[10px] text-slate-300 font-mono pointer-events-none">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span>Leaflet + OpenStreetMap Active • Click any station or map location</span>
+      <div className="pointer-events-none absolute bottom-2 left-3 z-[1000] hidden items-center gap-2 rounded-md border border-slate-200 bg-white/95 px-2.5 py-1 font-mono text-2xs text-slate-600 sm:flex">
+        <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+        <span>OpenStreetMap &middot; click a station or anywhere on the map</span>
       </div>
 
       {/* Error state */}
       {mapError && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-[#0B101B]/95 text-rose-300 text-xs text-center">
-          <AlertCircle className="w-5 h-5 text-rose-400 mr-2" />
+        <div className="absolute inset-0 z-50 flex items-center justify-center gap-2 bg-white/95 p-4 text-center text-xs text-rose-700">
+          <AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
           <span>{mapError}</span>
         </div>
       )}

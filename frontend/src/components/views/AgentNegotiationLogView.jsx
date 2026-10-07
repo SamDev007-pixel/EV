@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchNegotiationScenarios, resolveNegotiation, runMinimaxCompetition as solveMinimaxCompetition } from '../../services/api';
+import { PageHeader, StatTile, StateBlock } from '../common';
 import {
   Scale,
   CheckCircle2,
@@ -9,8 +10,17 @@ import {
   GitBranch,
   ShieldCheck,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
+
+/** Formats a solver-reported number, or an em dash when the field is absent. */
+function UTIL(value, digits = 2) {
+  if (value === null || value === undefined || value === '' || Number.isNaN(Number(value))) {
+    return '—';
+  }
+  return Number(value).toFixed(digits);
+}
 
 export default function AgentNegotiationLogView() {
   const [scenarios, setScenarios] = useState([]);
@@ -21,22 +31,22 @@ export default function AgentNegotiationLogView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const defaultScenarios = [
-    { id: 'SCENARIO_IMMEDIATE_VS_OVERLOAD', name: 'Immediate Charging vs Grid Transformer Overload', description: 'Two EVs demand fast charging simultaneously exceeding local substation capacity.' },
-    { id: 'SCENARIO_EMERGENCY_VS_STANDARD', name: 'Emergency Vehicle Preemption vs Standard Reservation', description: 'Critical emergency ambulance requires preemption over commuter vehicle.' },
-    { id: 'SCENARIO_PEAK_TARIFF_SHIFT', name: 'Peak-Hour Dynamic Tariff Shifting', description: 'High grid spot price during evening demand peak incentivizing cooperative delay.' }
-  ];
-
-  const displayScenarios = scenarios.length > 0 ? scenarios : defaultScenarios;
+  const [scenariosLoaded, setScenariosLoaded] = useState(false);
 
   const loadScenarios = async () => {
     try {
       const data = await fetchNegotiationScenarios();
-      if (Array.isArray(data) && data.length > 0) {
-        setScenarios(data);
+      const list = Array.isArray(data) ? data : [];
+      setScenarios(list);
+      setScenariosLoaded(true);
+      // Preselect the first scenario the backend actually exposes.
+      if (list.length > 0 && !list.some((sc) => sc.id === selectedScenario)) {
+        setSelectedScenario(list[0].id);
       }
     } catch (err) {
       console.warn('Failed to fetch negotiation scenarios:', err.message);
+      setScenarios([]);
+      setScenariosLoaded(true);
     }
   };
 
@@ -75,53 +85,56 @@ export default function AgentNegotiationLogView() {
 
   const chosenAction = negotiationResult?.chosen_action;
   const matrix = negotiationResult?.evaluations_matrix || [];
+  // The Nash product of the winning alternative is taken from its own matrix row, which is
+  // where the solver reports it (the chosen-action object itself does not repeat it).
+  const chosenRow = matrix.find((row) => row.alternative_id === chosenAction?.id);
+  const chosenActionNashProduct = chosenRow?.nash_bargaining_product;
+  // The solver ranks by Nash product first and falls back to social welfare whenever every
+  // product is zero (which happens when an agent sits below its disagreement point). The
+  // banner states which criterion actually decided this run instead of assuming one.
+  const bestNashProduct = matrix.reduce(
+    (max, row) => Math.max(max, Number(row.nash_bargaining_product) || 0),
+    0
+  );
+  const decidedBy = bestNashProduct > 0 ? 'Nash bargaining product' : 'Social welfare, after the hard-constraint filter';
 
   return (
-    <div className="space-y-6">
+    <div className="page">
       
-      {/* Top Banner: Academic Context */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/40 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">UNIT III: GAME THEORY &amp; DECISION MAKING</span>
-              <span className="text-xs text-slate-500 font-mono">NASH BARGAINING • MINIMAX • ALPHA-BETA PRUNING</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Conflict Resolution &amp; Game Decisions
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Mathematical conflict resolution evaluating multi-agent utility functions $U_i(a)$, Pareto-optimal frontiers, 
-              cooperative Nash Bargaining Products, and adversarial Minimax game trees with Alpha-Beta pruning.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
+      {/* Top Banner: Context */}
+      <PageHeader
+        eyebrow="Pipeline · stage 8"
+        title="Conflict resolution and game decisions"
+        description="When two vehicles compete for the same bay or slot, the disputed resource is arbitrated either cooperatively (Nash bargaining over the utility frontier) or adversarially (Minimax with alpha-beta pruning)."
+        actions={
+          <div className="tabs" role="tablist" aria-label="Decision model">
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeModelTab === 'nash'}
               onClick={() => {
                 setActiveModelTab('nash');
                 runNegotiation();
               }}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border ${
-                activeModelTab === 'nash' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'
-              }`}
+              className="tab"
             >
-              Nash Bargaining Solution
+              Nash bargaining
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeModelTab === 'minimax'}
               onClick={() => {
                 setActiveModelTab('minimax');
                 runMinimaxCompetition();
               }}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer border ${
-                activeModelTab === 'minimax' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200'
-              }`}
+              className="tab"
             >
-              Minimax / Alpha-Beta
+              Minimax / alpha-beta
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Error Alert Banner */}
       {error && (
@@ -144,12 +157,17 @@ export default function AgentNegotiationLogView() {
         <div className="space-y-6">
           
           {/* Scenario Selector */}
-          <div className="ai-card p-5 space-y-4">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Contention Scenarios
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {displayScenarios.map((sc) => {
+          <div className="ai-card section space-y-4">
+            <div className="section-head">
+              <div>
+                <h3 className="section-title">Contention scenarios</h3>
+                <p className="section-desc">
+                  Scenario definitions supplied by the backend game module.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {scenarios.map((sc) => {
                 const isSelected = selectedScenario === sc.id;
                 return (
                   <button
@@ -157,29 +175,49 @@ export default function AgentNegotiationLogView() {
                     onClick={() => setSelectedScenario(sc.id)}
                     className={`p-3.5 text-left rounded-lg border transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-blue-50/60 border-blue-500 shadow-xs'
+                        ? 'bg-blue-50/60 border-blue-500 shadow-sm'
                         : 'bg-white border-slate-200 hover:border-slate-300'
                     }`}
                   >
-                    <h4 className="font-bold text-xs text-slate-900 mb-1">{sc.name}</h4>
-                    <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2">{sc.description}</p>
+                    <h4 className="text-xs font-bold text-slate-900">{sc.name}</h4>
+                    <p className="text-2xs text-slate-500 leading-relaxed line-clamp-2">{sc.description}</p>
                   </button>
                 );
               })}
+
+              {scenariosLoaded && scenarios.length === 0 && (
+                <div className="sm:col-span-3">
+                  <StateBlock
+                    variant="error"
+                    title="No contention scenario could be loaded"
+                    detail="The game-decision service did not return any scenario definition."
+                    action={
+                      <button type="button" onClick={loadScenarios} className="btn-secondary btn-sm">
+                        Retry
+                      </button>
+                    }
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           {/* Selected Action Resolution Banner */}
           {chosenAction && (
-            <div className="ai-card p-5 border-blue-200 bg-blue-50/30">
+            <div className="ai-card section border-blue-200 bg-blue-50/30">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="badge-blue">MAXIMIZED NASH BARGAINING PRODUCT</span>
-                    <span className="badge-emerald font-mono">PARETO EFFICIENT</span>
+                    <span className="badge-blue">Selected by {decidedBy}</span>
+                    {chosenRow?.is_pareto_efficient && (
+                      <span className="badge-emerald">Pareto efficient</span>
+                    )}
+                    {chosenRow && !chosenRow.is_hard_constraint_satisfied && (
+                      <span className="badge-rose">Hard constraint violated</span>
+                    )}
                   </div>
                   <h3 className="text-base font-bold text-slate-900">
-                    Selected Equilibrium: {chosenAction.name} ({chosenAction.id})
+                    {chosenAction.title} ({chosenAction.id})
                   </h3>
                   <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
                     {negotiationResult?.explanation}
@@ -187,9 +225,9 @@ export default function AgentNegotiationLogView() {
                 </div>
 
                 <div className="p-3 bg-white border border-slate-200 rounded-lg text-center shrink-0">
-                  <span className="text-[10px] uppercase text-slate-400 font-bold block">Nash Product N(a)</span>
+                  <span className="kv-term">Nash product N(a)</span>
                   <span className="text-xl font-bold text-blue-600 font-mono">
-                    {chosenAction.nash_product?.toFixed(1) || '3,420'}
+                    {UTIL(chosenActionNashProduct, 1)}
                   </span>
                 </div>
               </div>
@@ -197,13 +235,13 @@ export default function AgentNegotiationLogView() {
           )}
 
           {/* Payoff Evaluation Matrix Table */}
-          <div className="ai-card p-5 space-y-4">
+          <div className="ai-card section space-y-4">
             <div className="border-b border-slate-200 pb-3">
               <h3 className="text-sm font-bold text-slate-900">
                 Action Payoff &amp; Multi-Agent Utility Matrix
               </h3>
               <p className="text-xs text-slate-500">
-                Evaluation across all game actions against agent disagreement points $d_i$
+                Each action scored against every agent's disagreement point (the payoff below which that agent rejects the deal).
               </p>
             </div>
 
@@ -211,13 +249,15 @@ export default function AgentNegotiationLogView() {
               <table className="ai-table">
                 <thead>
                   <tr>
-                    <th>Alternative Action</th>
-                    <th className="text-right">EV Utility U_EV</th>
-                    <th className="text-right">Grid Utility U_Grid</th>
-                    <th className="text-right">Station Utility U_Station</th>
-                    <th className="text-right">Social Welfare &Sigma; U_i</th>
-                    <th className="text-right">Nash Product N(a)</th>
-                    <th className="text-center">Pareto Optimal?</th>
+                    <th>Alternative</th>
+                    <th className="num">EV agent</th>
+                    <th className="num">Grid agent</th>
+                    <th className="num">Station agent</th>
+                    <th className="num">Energy agent</th>
+                    <th className="num">Social welfare</th>
+                    <th className="num">Nash product</th>
+                    <th className="col-center">Hard constraints</th>
+                    <th className="col-center">Pareto optimal</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -225,23 +265,31 @@ export default function AgentNegotiationLogView() {
                     const isChosen = chosenAction && row.alternative_id === chosenAction.id;
 
                     return (
-                      <tr key={i} className={isChosen ? 'bg-blue-50/50 font-bold' : ''}>
+                      <tr key={i} className={isChosen ? 'row-selected font-semibold' : ''}>
                         <td className="font-semibold text-slate-900">
                           <div className="flex items-center gap-1.5">
-                            <span>{row.name || row.alternative_id}</span>
-                            {isChosen && <span className="badge-blue text-[9px]">CHOSEN</span>}
+                            <span className="truncate">{row.alternative_title || row.alternative_id}</span>
+                            {isChosen && <span className="badge-blue text-2xs">CHOSEN</span>}
                           </div>
                         </td>
-                        <td className="text-right font-mono text-slate-800">{row.utilities?.EV_USER ?? row.u_ev ?? 75}</td>
-                        <td className="text-right font-mono text-slate-800">{row.utilities?.GRID_OPERATOR ?? row.u_grid ?? 82}</td>
-                        <td className="text-right font-mono text-slate-800">{row.utilities?.STATION_OWNER ?? row.u_station ?? 70}</td>
-                        <td className="text-right font-mono text-slate-900 font-bold">{row.social_welfare ?? 227}</td>
-                        <td className="text-right font-mono text-blue-600 font-bold">{row.nash_product?.toFixed(1) ?? '3,420'}</td>
-                        <td className="text-center">
-                          {row.is_pareto_efficient ? (
-                            <span className="badge-emerald">PARETO</span>
+                        <td className="num font-mono">{UTIL(row.utilities?.EV_AGENT)}</td>
+                        <td className="num font-mono">{UTIL(row.utilities?.GRID_AGENT)}</td>
+                        <td className="num font-mono">{UTIL(row.utilities?.STATION_AGENT)}</td>
+                        <td className="num font-mono">{UTIL(row.utilities?.ENERGY_AGENT)}</td>
+                        <td className="num font-mono font-bold">{UTIL(row.social_welfare_score)}</td>
+                        <td className="num font-mono font-bold text-blue-700">{UTIL(row.nash_bargaining_product, 1)}</td>
+                        <td className="col-center">
+                          {row.is_hard_constraint_satisfied ? (
+                            <span className="badge-emerald">Satisfied</span>
                           ) : (
-                            <span className="badge-slate text-slate-400">DOMINATED</span>
+                            <span className="badge-rose">Violated</span>
+                          )}
+                        </td>
+                        <td className="col-center">
+                          {row.is_pareto_efficient ? (
+                            <span className="badge-emerald">Pareto</span>
+                          ) : (
+                            <span className="badge-slate">Dominated</span>
                           )}
                         </td>
                       </tr>
@@ -250,6 +298,28 @@ export default function AgentNegotiationLogView() {
                 </tbody>
               </table>
             </div>
+
+            {matrix.some((row) => row.rejection_reason) && (
+              <div className="space-y-2">
+                <span className="kv-term">Why the rejected alternatives were set aside</span>
+                <ul className="space-y-1.5">
+                  {matrix
+                    .filter((row) => row.rejection_reason)
+                    .map((row) => (
+                      <li
+                        key={row.alternative_id}
+                        className="flex items-start gap-2 rounded-md border border-slate-200 p-2.5 text-2xs leading-relaxed text-slate-600"
+                      >
+                        <XCircle className="mt-px h-3.5 w-3.5 shrink-0 text-rose-500" />
+                        <span>
+                          <strong className="text-slate-800">{row.alternative_id}</strong>{' '}
+                          {row.rejection_reason}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
           </div>
 
         </div>
@@ -258,7 +328,7 @@ export default function AgentNegotiationLogView() {
       {/* MODEL 2: MINIMAX & ALPHA-BETA PRUNING */}
       {activeModelTab === 'minimax' && (
         <div className="space-y-6">
-          <div className="ai-card p-5 space-y-4">
+          <div className="ai-card section space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -273,7 +343,7 @@ export default function AgentNegotiationLogView() {
               <button
                 onClick={runMinimaxCompetition}
                 disabled={loading}
-                className="btn-primary text-xs flex items-center gap-1.5 shadow-xs"
+                className="btn-primary text-xs flex items-center gap-1.5 shadow-sm"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                 <span>Re-Solve Minimax Tree</span>
@@ -284,45 +354,46 @@ export default function AgentNegotiationLogView() {
             {(() => {
               const mRes = minimaxResult?.result || minimaxResult;
               const mMetrics = minimaxResult?.metrics || {};
-              const prunedCutoffs = (mMetrics.alpha_cutoffs ?? mRes?.alpha_cutoffs ?? 0) + (mMetrics.beta_cutoffs ?? mRes?.beta_cutoffs ?? 0) || 4;
-              const evaluatedNodes = mMetrics.nodes_evaluated ?? mRes?.nodes_evaluated ?? 12;
-              const minimaxUtil = mMetrics.minimax_utility ?? mRes?.minimax_utility ?? 18.5;
-              const bestAction = mRes?.ev1_optimal_action?.action_id || mRes?.best_action || 'CLAIM_BAY_FAST';
-              const explanationText = minimaxResult?.explanation || mRes?.explanation || `Minimax ensures that Player 1 (MAX) achieves at least V* = ${minimaxUtil >= 0 ? '+' : ''}${typeof minimaxUtil === 'number' ? minimaxUtil.toFixed(2) : minimaxUtil} utility regardless of Player 2's adversarial actions. Alpha-Beta pruning eliminated ${prunedCutoffs} suboptimal subtrees without loss of mathematical precision.`;
+              // Values are read from the solver response. Nothing is substituted when a
+              // field is absent - the tile simply reports "n/a".
+              const alphaCutoffs = mMetrics.alpha_cutoffs ?? mRes?.alpha_cutoffs;
+              const betaCutoffs = mMetrics.beta_cutoffs ?? mRes?.beta_cutoffs;
+              const prunedCutoffs =
+                alphaCutoffs === undefined && betaCutoffs === undefined
+                  ? null
+                  : (alphaCutoffs ?? 0) + (betaCutoffs ?? 0);
+              const evaluatedNodes = mMetrics.nodes_evaluated ?? mRes?.nodes_evaluated;
+              const minimaxUtil = mMetrics.minimax_utility ?? mRes?.minimax_utility;
+              const bestAction = mRes?.ev1_optimal_action?.action_id || mRes?.best_action;
+              const explanationText = minimaxResult?.explanation || mRes?.explanation;
 
               return (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="ai-card p-3 text-center">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Pruned Branches (&alpha; &ge; &beta;)</span>
-                      <span className="text-lg font-bold text-emerald-700 font-mono">
-                        {prunedCutoffs} Branches Cut
-                      </span>
-                    </div>
-                    <div className="ai-card p-3 text-center">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Evaluated Nodes</span>
-                      <span className="text-lg font-bold text-slate-900 font-mono">
-                        {evaluatedNodes}
-                      </span>
-                    </div>
-                    <div className="ai-card p-3 text-center">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Optimal Value V*</span>
-                      <span className="text-lg font-bold text-blue-600 font-mono">
-                        {typeof minimaxUtil === 'number' ? `${minimaxUtil >= 0 ? '+' : ''}${minimaxUtil.toFixed(2)}` : minimaxUtil}
-                      </span>
-                    </div>
-                    <div className="ai-card p-3 text-center">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold block">Decision</span>
-                      <span className="text-lg font-bold text-slate-900">
-                        {bestAction}
-                      </span>
-                    </div>
+                  <div className="stat-grid">
+                    <StatTile
+                      label="Pruned branches"
+                      value={prunedCutoffs}
+                      tone="success"
+                      hint="Subtrees cut by alpha-beta without changing the result"
+                    />
+                    <StatTile label="Nodes evaluated" value={evaluatedNodes} hint="Game-tree nodes actually expanded" />
+                    <StatTile
+                      label="Optimal value V*"
+                      value={
+                        typeof minimaxUtil === 'number'
+                          ? `${minimaxUtil >= 0 ? '+' : ''}${minimaxUtil.toFixed(2)}`
+                          : minimaxUtil
+                      }
+                      tone="primary"
+                      hint="Guaranteed utility against best opposition"
+                    />
+                    <StatTile label="Chosen action" value={bestAction} size="sm" />
                   </div>
 
                   {/* Decision Rationale */}
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 leading-relaxed">
-                    <strong className="text-slate-900 block mb-1">Game-Theoretic Guarantee:</strong>
-                    {explanationText}
+                    <strong className="mb-1 block text-slate-900">Solver rationale</strong>
+                    {explanationText || 'The solver did not return an explanation string for this run.'}
                   </div>
                 </>
               );

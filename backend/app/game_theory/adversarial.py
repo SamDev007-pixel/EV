@@ -59,7 +59,7 @@ class MinimaxDecisionResult(BaseModel):
 
 class AdversarialBargainingGame:
     """
-    Unit III: Adversarial Search & Game Playing.
+    Adversarial search: two-player game tree with minimax and alpha-beta pruning.
     2-Player Zero-Sum Game:
     - MAX Player: EV Fleet Aggregator seeking maximum power at minimal tariff.
     - MIN Player: Grid/Station Energy Broker seeking grid headroom preservation and peak moderation.

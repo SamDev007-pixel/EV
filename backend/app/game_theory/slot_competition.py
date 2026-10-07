@@ -1,7 +1,6 @@
 """
 Two-Agent EV Charging Resource Competition Decision Game.
-FOAI Unit III: Game Playing & Adversarial Search (Minimax and Alpha-Beta Pruning).
-Russell & Norvig, Artificial Intelligence: A Modern Approach (Chapter 5).
+Adversarial search over competing charging-slot bids (Minimax with alpha-beta pruning).
 
 Educational Demonstration Scenario:
 - Two competing autonomous EV agents (EV-1 [MAX] and EV-2 [MIN]) arrive at a charging station.

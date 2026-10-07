@@ -57,15 +57,17 @@ class DecisionPipelineResult(BaseModel):
 
 class UnifiedAIDecisionPipeline:
     """
-    Unified Master Classical AI Decision Pipeline.
-    Integrates all syllabus units:
-    1. Problem Formulation (Unit I)
-    2. Intelligent Agent Coordination (Unit I)
-    3. Search Algorithms & Station Selection (Unit II)
-    4. CSP Scheduling (Unit III)
-    5. Game Theoretic Conflict Resolution (Unit III)
-    6. Logical Inference & DPLL SAT Verification (Unit IV)
-    7. Explainable AI Registry (Unit V)
+    Unified decision pipeline: runs the full reasoning chain for one request and
+    records every stage that produced the outcome.
+
+    Stages, in execution order:
+    1. Problem formulation (formal state / action / goal / cost model)
+    2. Agent coordination (EV, station, grid and energy agents)
+    3. Search-based station selection
+    4. CSP scheduling (backtracking with MRV/LCV/forward checking/AC-3)
+    5. Game-theoretic conflict resolution
+    6. Logical inference and SAT verification
+    7. Explanation registry (the decision is stored for later lookup)
     """
 
     @classmethod

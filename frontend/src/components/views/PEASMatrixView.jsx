@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Target, Layers, Sliders, Activity, RefreshCw, Loader2, AlertCircle, Cpu } from 'lucide-react';
+import { Target, Layers, Sliders, Activity, RefreshCw, Loader2, Cpu } from 'lucide-react';
 import { fetchPEAS } from '../../services/api';
+import { Banner, KeyValueGrid, StatTile, StateBlock } from '../common';
 
 const QUADRANTS = [
   { key: 'performance_measure', label: 'Performance Measure (P)', icon: Target, tone: 'text-blue-700' },
@@ -10,7 +11,7 @@ const QUADRANTS = [
 ];
 
 /**
- * PEAS panel (FOAI Unit I).
+ * PEAS panel.
  *
  * The specification and the numbers shown here are fetched from GET /api/peas: the
  * specification is the agent description, and `measured_metrics` is read from the live
@@ -45,54 +46,53 @@ export default function PEASMatrixView() {
   const provenance = data?.data_provenance;
 
   return (
-    <div className="ai-card p-5 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-50 border border-blue-200 text-blue-700 rounded-md flex items-center justify-center">
-            <Cpu className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              PEAS Specification — {spec?.agent_name || 'agent'}
+    <div className="ai-card section space-y-4">
+      <div className="section-head">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500">
+            <Cpu className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="section-title">
+              PEAS specification{spec?.agent_name ? ` — ${spec.agent_name}` : ''}
             </h3>
-            <p className="text-xs text-slate-500">
-              Unit I: the environment an intelligent agent is defined against, with the metrics the running system measures.
+            <p className="section-desc">
+              What the agent perceives, how it acts, what it is measured on, and the environment it
+              operates in.
             </p>
           </div>
         </div>
-        <button onClick={load} disabled={loading} className="btn-secondary text-xs flex items-center gap-1.5">
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          <span>Refresh</span>
+        <button type="button" onClick={load} disabled={loading} className="btn-secondary btn-sm">
+          {loading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          Refresh
         </button>
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-800 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <Banner variant="error" action={<button type="button" onClick={load} className="btn-secondary btn-sm">Retry</button>}>
+          {error}
+        </Banner>
       )}
 
-      {loading && !spec && (
-        <div className="py-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-          <span>Loading PEAS specification…</span>
-        </div>
-      )}
+      {loading && !spec && <StateBlock variant="loading" title="Loading PEAS specification…" />}
 
       {spec && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {QUADRANTS.map(({ key, label, icon: Icon, tone }) => (
-              <div key={key} className="border border-slate-200 rounded-md p-3.5 bg-slate-50/60">
-                <div className={`flex items-center gap-2 font-bold text-xs mb-2 ${tone}`}>
-                  <Icon className="w-3.5 h-3.5" />
-                  <span className="uppercase tracking-wider">{label}</span>
+              <div key={key} className="ai-card-flat space-y-2">
+                <div className={`flex items-center gap-2 text-xs font-semibold ${tone}`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span>{label}</span>
                 </div>
-                <ul className="space-y-1.5 text-xs text-slate-700">
+                <ul className="space-y-1.5 text-xs leading-relaxed text-slate-700">
                   {(spec[key] || []).map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5">
-                      <span className="text-slate-400 font-bold">•</span>
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-300" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -103,60 +103,49 @@ export default function PEASMatrixView() {
 
           {metrics && (
             <div>
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Measured performance counters (live simulation)
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-center">
+              <span className="kv-term">Measured performance counters (live simulation)</span>
+              <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-5">
                 {[
                   ['EVs processed', metrics.total_evs_processed],
                   ['Completed', metrics.completed_evs],
                   ['Timed out', metrics.timed_out_evs],
-                  ['Avg wait (min)', metrics.average_wait_time_min],
-                  ['Overload incidents', metrics.grid_overload_incidents],
-                  ['Peak load (kW)', metrics.peak_grid_load_kw],
-                  ['Charger util (%)', metrics.station_avg_utilization_pct],
-                  ['Emergency served', metrics.emergency_evs_serviceed ?? metrics.emergency_evs_serviced],
-                  ['Energy (kWh)', metrics.total_energy_delivered_kwh],
-                  ['Solar used (kWh)', metrics.solar_utilized_kwh],
-                ].map(([label, value]) => (
-                  <div key={label} className="bg-slate-50 border border-slate-200 rounded-md py-2 px-1">
-                    <div className="text-sm font-bold text-slate-900 font-mono">{value ?? 0}</div>
-                    <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
-                  </div>
+                  ['Average wait', metrics.average_wait_time_min, 'min'],
+                  ['Grid overloads', metrics.grid_overload_incidents],
+                  ['Peak grid load', metrics.peak_grid_load_kw, 'kW'],
+                  ['Charger utilisation', metrics.station_avg_utilization_pct, '%'],
+                  ['Emergency served', metrics.emergency_evs_serviced],
+                  ['Energy delivered', metrics.total_energy_delivered_kwh, 'kWh'],
+                  ['Solar used', metrics.solar_utilized_kwh, 'kWh']
+                ].map(([label, value, unit]) => (
+                  <StatTile key={label} label={label} value={value} unit={unit} size="sm" />
                 ))}
               </div>
             </div>
           )}
 
           {classification && (
-            <div className="border border-slate-200 rounded-md p-3.5">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Environment classification (backend taxonomy)
-              </h4>
-              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {Object.entries(classification).map(([k, v]) => (
-                  <div key={k} className="flex flex-col">
-                    <dt className="font-semibold text-slate-600 uppercase text-[10px] tracking-wide">
-                      {k.replace(/_/g, ' ')}
-                    </dt>
-                    <dd className="text-slate-700">{String(v)}</dd>
-                  </div>
-                ))}
-              </dl>
+            <div className="space-y-2">
+              <span className="kv-term">Environment classification</span>
+              <KeyValueGrid
+                columns={2}
+                items={Object.entries(classification).map(([k, v]) => ({
+                  term: k.replace(/_/g, ' '),
+                  value: String(v),
+                }))}
+              />
             </div>
           )}
 
           {provenance && (
-            <div className="border border-slate-200 rounded-md p-3.5 bg-slate-50/60">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Data provenance</h4>
-              <ul className="space-y-1 text-xs text-slate-700">
-                {Object.entries(provenance).map(([k, v]) => (
-                  <li key={k}>
-                    <span className="font-semibold">{k.replace(/_/g, ' ')}: </span>
-                    <span>{String(v)}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="space-y-2">
+              <span className="kv-term">Data provenance</span>
+              <KeyValueGrid
+                columns={2}
+                items={Object.entries(provenance).map(([k, v]) => ({
+                  term: k.replace(/_/g, ' '),
+                  value: String(v),
+                }))}
+              />
             </div>
           )}
         </>

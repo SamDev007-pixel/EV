@@ -16,7 +16,6 @@ class ExplanationRecord(BaseModel):
     timestamp: float = Field(default_factory=lambda: time.time())
     topic: str
     algorithm_used: str
-    syllabus_unit: str = "FOAI Core"
     input_data: Dict[str, Any] = Field(default_factory=dict)
     selected_decision: Dict[str, Any] = Field(default_factory=dict)
     alternatives_evaluated: List[Dict[str, Any]] = Field(default_factory=list)

@@ -1,7 +1,6 @@
 """
 Online Search with Learning Real-Time A* (LRTA*).
-FOAI Unit II: Online Search Agents and Unknown Environments.
-Russell & Norvig, Artificial Intelligence: A Modern Approach (Chapter 4.5).
+Online search agents for environments whose structure is unknown up front.
 
 Unlike offline search algorithms (which compute a full path before moving), an
 Online Search Agent interleaves computation and physical execution in unknown or

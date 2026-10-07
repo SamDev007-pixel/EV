@@ -1,7 +1,6 @@
 """
 Belief-State Search in Partially Observable Environments.
-FOAI Unit II: Searching in Partially Observable Environments.
-Russell & Norvig, Artificial Intelligence: A Modern Approach (Chapter 4.4).
+Belief-state search for partially observable environments.
 
 In real-world EV charging scenarios, charging stations may lack real-time IoT meters
 or telemetry may be partially degraded. The agent cannot observe the exact physical world state,

@@ -25,6 +25,6 @@ def root():
     return {
         "system": "Intelligent EV Charging & Resource Management System",
         "status": "OPERATIONAL",
-        "ai_foundation": "Classical Artificial Intelligence (Units I-IV)",
+        "ai_foundation": "Classical artificial intelligence: heuristic search, constraint satisfaction, logical inference and game theory",
         "phase": "Phase 1 - Core Domain Models & PEAS Environment"
     }

@@ -1,72 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { fetchCSPScenarios, solveCSPSchedule } from '../../services/api';
-import {
-  Calendar,
-  Zap,
-  CheckCircle2,
-  AlertTriangle,
-  Play,
-  Sliders,
-  Clock,
-  Loader2,
-  Check,
-  AlertCircle
-} from 'lucide-react';
+import { PageHeader, Section, StatTile, StateBlock, Banner } from '../common';
+import { Calendar, Play, Loader2, AlertCircle, Check, Table2, Info } from 'lucide-react';
+
+const TIMELINE_MINUTES = 180;
+
+function timelineLabels(step = 15) {
+  const labels = [];
+  for (let t = 0; t <= TIMELINE_MINUTES; t += step) labels.push(t);
+  return labels;
+}
 
 export default function CSPSchedulerView() {
   const [scenarios, setScenarios] = useState([]);
+  const [scenariosLoaded, setScenariosLoaded] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState('NORMAL_DEMAND');
+
   const [enableFC, setEnableFC] = useState(true);
   const [enableAC3, setEnableAC3] = useState(true);
   const [enableMRV, setEnableMRV] = useState(true);
+  const [enableLCV, setEnableLCV] = useState(true);
 
   const [cspData, setCspData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('gantt');
-
-  const defaultScenarios = [
-    { id: 'NORMAL_DEMAND', name: 'Normal Demand (5 EVs, 4 Bays)', description: 'Balanced arrival distribution where all vehicles can be feasibly scheduled without preemption.' },
-    { id: 'RUSH_HOUR', name: 'Rush Hour Contention (8 EVs, 4 Bays)', description: 'High arrival density exceeding immediate capacity. Tests MRV heuristic and constraint backtracking.' },
-    { id: 'EMERGENCY_PREEMPTION', name: 'Emergency Preemption (Ambulance Arrival)', description: 'Critical emergency fleet vehicle requiring immediate guaranteed bay allocation.' }
-  ];
-
-  const displayScenarios = scenarios.length > 0 ? scenarios : defaultScenarios;
-
-  const loadScenarios = async () => {
-    try {
-      const data = await fetchCSPScenarios();
-      if (Array.isArray(data) && data.length > 0) {
-        setScenarios(data);
-      }
-    } catch (err) {
-      console.warn('CSP scenarios fetch notice:', err.message);
-    }
-  };
-
-  const runCSPSolver = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await solveCSPSchedule({
-        scenario_name: selectedScenario,
-        enable_forward_checking: enableFC,
-        enable_ac3: enableAC3,
-        enable_mrv: enableMRV
-      });
-      setCspData(res);
-    } catch (err) {
-      console.error('Failed to run CSP solver', err);
-      setError(err.message || 'Failed to generate CSP schedule.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadScenarios();
-    runCSPSolver();
-  }, [selectedScenario]);
+  const [view, setView] = useState('timeline');
 
   const problemState = cspData?.problem_state;
   const solution = cspData?.solution;
@@ -74,276 +32,545 @@ export default function CSPSchedulerView() {
   const stats = solution?.stats;
   const utility = solution?.utility_score;
 
-  const totalDuration = 180;
-  const timeLabels = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
+  const loadScenarios = useCallback(async () => {
+    try {
+      const data = await fetchCSPScenarios();
+      const list = Array.isArray(data) ? data : [];
+      setScenarios(list);
+      if (list.length > 0 && !list.some((s) => s.id === selectedScenario)) {
+        setSelectedScenario(list[0].id);
+      }
+    } catch (err) {
+      console.warn('CSP scenario list unavailable:', err.message);
+      setScenarios([]);
+    } finally {
+      setScenariosLoaded(true);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const runSolver = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await solveCSPSchedule({
+        scenario_name: selectedScenario,
+        enable_forward_checking: enableFC,
+        enable_ac3: enableAC3,
+        enable_mrv: enableMRV,
+        enable_lcv: enableLCV
+      });
+      setCspData(res);
+    } catch (err) {
+      console.error('Failed to run the CSP solver', err);
+      setCspData(null);
+      setError(err.message || 'The scheduler could not produce a solution.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedScenario, enableFC, enableAC3, enableMRV, enableLCV]);
+
+  useEffect(() => {
+    loadScenarios();
+  }, [loadScenarios]);
+
+  useEffect(() => {
+    runSolver();
+  }, [runSolver]);
+
+  const variables = Object.entries(problemState?.variables || {});
+  const violated = stats?.violated_constraints_summary || [];
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Banner: Academic Context */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/40 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">UNIT III: CONSTRAINT SATISFACTION</span>
-              <span className="text-xs text-slate-500 font-mono">BACKTRACKING • MRV • LCV • AC-3</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Smart Charging Scheduler (CSP)
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Discrete resource allocation mapping EV Requests $\to$ Stations $\to$ Charger Bays $\to$ 15-minute Time Slots 
-              while strictly enforcing non-overlap, power limits, and departure deadlines.
-            </p>
-          </div>
+    <div className="page">
 
-          <button
-            onClick={runCSPSolver}
-            disabled={loading}
-            className="btn-primary text-xs flex items-center gap-1.5 self-start md:self-center shadow-xs"
-          >
-            {loading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Play className="w-3.5 h-3.5 fill-current" />
-            )}
-            <span>Execute CSP Solver</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Pipeline · stage 5"
+        title="Charging schedule as a constraint satisfaction problem"
+        description="Vehicles are assigned to a charger and a 15-minute time slot while the solver enforces bay non-overlap, station power capacity, connector compatibility and departure deadlines."
+        actions={
+          <>
+            <button type="button" onClick={runSolver} disabled={loading} className="btn-primary">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              {loading ? 'Solving…' : 'Solve schedule'}
+            </button>
+          </>
+        }
+      />
 
-      {/* Error Alert Banner */}
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span><strong>Scheduler Error:</strong> {error}</span>
-          </div>
-          <button
-            onClick={runCSPSolver}
-            className="btn-secondary text-xs px-2.5 py-1 shrink-0"
-          >
-            Retry Solver
-          </button>
-        </div>
+        <Banner
+          variant="error"
+          action={
+            <button type="button" onClick={runSolver} className="btn-secondary btn-sm">
+              Retry solver
+            </button>
+          }
+        >
+          <strong>Scheduler error.</strong> {error}
+        </Banner>
       )}
 
-      {/* Preset Scenarios Selector */}
-      <div className="ai-card p-5 space-y-4">
-        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          Select Fleet Contention Scenario
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {displayScenarios.map((sc) => {
-            const isSelected = selectedScenario === sc.id;
-            return (
-              <button
-                key={sc.id}
-                onClick={() => setSelectedScenario(sc.id)}
-                className={`p-3 text-left rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
-                  isSelected
-                    ? 'bg-blue-50/60 border-blue-500 shadow-xs'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div>
-                  <h4 className="font-bold text-xs text-slate-900 mb-1">{sc.name.split('(')[0]}</h4>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{sc.description}</p>
-                </div>
-                {isSelected && (
-                  <span className="mt-2 text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
-                    <Check className="w-3 h-3 text-blue-600" /> Active Scenario
-                  </span>
-                )}
+      {/* Scenario selection + solver options */}
+      <Section
+        title="Scenario and propagation techniques"
+        description="Techniques can be switched off individually to see their effect on backtracks and constraint checks."
+      >
+        {scenariosLoaded && scenarios.length === 0 ? (
+          <StateBlock
+            variant="error"
+            title="No scheduling scenario could be loaded"
+            detail="The scheduler service did not return any scenario definition."
+            action={
+              <button type="button" onClick={loadScenarios} className="btn-secondary btn-sm">
+                Retry
               </button>
-            );
-          })}
-        </div>
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {scenarios.map((sc) => {
+              const isSelected = selectedScenario === sc.id;
+              return (
+                <button
+                  key={sc.id}
+                  type="button"
+                  onClick={() => setSelectedScenario(sc.id)}
+                  className={`flex flex-col rounded-lg border p-3 text-left transition-colors ${
+                    isSelected
+                      ? 'border-blue-400 bg-blue-50/60'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-900">{sc.name}</span>
+                    {isSelected && <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-blue-600" />}
+                  </span>
+                  <span className="mt-1 block text-2xs leading-relaxed text-slate-500">
+                    {sc.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Solver Options */}
-        <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-wrap items-center justify-between gap-4 text-xs">
-          <span className="font-semibold text-slate-700">Constraint Propagation Techniques:</span>
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <span className="kv-term">Solver techniques</span>
+          {[
+            ['MRV (minimum remaining values)', enableMRV, setEnableMRV],
+            ['LCV (least constraining value)', enableLCV, setEnableLCV],
+            ['Forward checking', enableFC, setEnableFC],
+            ['AC-3 arc consistency', enableAC3, setEnableAC3]
+          ].map(([label, checked, setter]) => (
+            <label key={label} className="flex cursor-pointer items-center gap-2 text-xs text-slate-700">
               <input
                 type="checkbox"
-                checked={enableMRV}
-                onChange={(e) => setEnableMRV(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded"
+                checked={checked}
+                onChange={(e) => setter(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600"
               />
-              <span>MRV (Minimum Remaining Values)</span>
+              {label}
             </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
-              <input
-                type="checkbox"
-                checked={enableFC}
-                onChange={(e) => setEnableFC(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded"
+          ))}
+        </div>
+      </Section>
+
+      {/* Outcome */}
+      {loading && !cspData ? (
+        <Section title="Solving">
+          <StateBlock
+            variant="loading"
+            title="Running backtracking search"
+            detail="The solver is exploring the variable ordering and slot domains."
+          />
+        </Section>
+      ) : solution ? (
+        <>
+          <Section
+            title="Solver outcome"
+            description={solution.explanation}
+          >
+            <div className="stat-grid">
+              <StatTile
+                label="Feasibility"
+                value={solution.is_feasible ? 'Feasible' : 'Infeasible'}
+                tone={solution.is_feasible ? 'success' : 'danger'}
+                hint={
+                  solution.is_feasible
+                    ? `${assignments ? Object.keys(assignments).length : 0} vehicles placed`
+                    : 'No assignment satisfies every hard constraint'
+                }
               />
-              <span>Forward Checking</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer text-slate-700">
-              <input
-                type="checkbox"
-                checked={enableAC3}
-                onChange={(e) => setEnableAC3(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded"
+              <StatTile
+                label="Backtracks"
+                value={stats?.backtracks_count ?? 'n/a'}
+                tone={stats?.backtracks_count > 0 ? 'warning' : 'success'}
+                hint={stats?.backtracks_count > 0 ? 'Partial assignments were undone' : 'First descent reached a solution'}
               />
-              <span>AC-3 Arc Consistency</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Solver Telemetry Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="ai-card p-3 text-center">
-            <span className="text-[10px] uppercase text-slate-500 font-semibold block">Feasibility</span>
-            <span className={`text-base font-bold ${solution?.is_feasible ? 'text-emerald-700' : 'text-rose-700'}`}>
-              {solution?.is_feasible ? 'FEASIBLE' : 'INFEASIBLE (UNSAT)'}
-            </span>
-          </div>
-          <div className="ai-card p-3 text-center">
-            <span className="text-[10px] uppercase text-slate-500 font-semibold block">Search Backtracks</span>
-            <span className="text-base font-bold text-slate-900 font-mono">{stats.backtracks}</span>
-          </div>
-          <div className="ai-card p-3 text-center">
-            <span className="text-[10px] uppercase text-slate-500 font-semibold block">Constraint Checks</span>
-            <span className="text-base font-bold text-slate-900 font-mono">{stats.constraint_checks}</span>
-          </div>
-          <div className="ai-card p-3 text-center">
-            <span className="text-[10px] uppercase text-slate-500 font-semibold block">Solver Runtime</span>
-            <span className="text-base font-bold text-blue-600 font-mono">{stats.runtime_ms} ms</span>
-          </div>
-        </div>
-      )}
-
-      {/* Rationale / Conflict Banner */}
-      {solution && (
-        <div className={`p-4 border rounded-lg text-xs ${
-          solution.is_feasible
-            ? 'bg-emerald-50/60 border-emerald-200 text-emerald-900'
-            : 'bg-rose-50/60 border-rose-200 text-rose-900'
-        }`}>
-          <div className="flex items-center gap-2 mb-1">
-            {solution.is_feasible ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            )}
-            <strong className="text-xs uppercase tracking-wider">
-              {solution.is_feasible ? 'Optimal Schedule Formulation' : 'Constraint Bottleneck Detected'}
-            </strong>
-          </div>
-          <p className="leading-relaxed text-xs pl-6">{solution.explanation}</p>
-        </div>
-      )}
-
-      {/* Visual Gantt Timeline */}
-      <div className="ai-card p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-blue-600" />
-              <span>Charging Timeline Schedule (0 to 180 Minutes)</span>
-            </h3>
-            <p className="text-xs text-slate-500">Visual mapping of discrete 15-minute slot assignments</p>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-slate-600">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-blue-600"></span> Allocated Slot
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 bg-amber-500"></span> Departure Deadline
-            </span>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto pb-2">
-          <div className="min-w-[850px] space-y-3">
-            {/* Time Axis Header */}
-            <div className="flex items-center font-mono text-[10px] text-slate-500 pb-2 border-b border-slate-200">
-              <div className="w-48 shrink-0 font-bold uppercase tracking-wider pl-2 font-sans text-slate-700">
-                Vehicle &amp; Priority
-              </div>
-              <div className="flex-1 flex justify-between relative px-2">
-                {timeLabels.map((time) => (
-                  <div key={time} className="text-center font-semibold">
-                    {time}m
-                  </div>
-                ))}
-              </div>
+              <StatTile
+                label="Constraint checks"
+                value={stats?.constraint_checks_count ?? 'n/a'}
+                hint={`${stats?.domain_values_generated ?? 0} domain values generated`}
+              />
+              <StatTile
+                label="Solver runtime"
+                value={stats?.execution_time_ms ?? 'n/a'}
+                unit="ms"
+                tone="primary"
+                hint={`${stats?.solutions_found_count ?? 0} complete solution(s) found`}
+              />
             </div>
 
-            {/* Allocation Rows */}
-            {Object.keys(problemState?.variables || {}).length > 0 ? (
-              Object.entries(problemState?.variables || {}).map(([evId, evVar]) => {
-                const assign = assignments[evId];
-                const isEmergency = evVar.priority === 'EMERGENCY';
-                const deadlinePercent = Math.min(100, Math.max(0, (evVar.departure_deadline / totalDuration) * 100));
-
-                return (
-                  <div key={evId} className="flex items-center text-xs py-2.5 border-b border-slate-100 hover:bg-slate-50/80 transition-colors px-2">
-                    <div className="w-48 shrink-0 pr-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 font-mono text-xs">{evId}</span>
-                        <span className={`px-1.5 py-0.2 text-[9px] font-semibold rounded ${
-                          isEmergency ? 'badge-rose' : 'badge-blue'
-                        }`}>
-                          {evVar.priority}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-500 block truncate">
-                        {assign ? `Bay ${assign.bay_id} @ ${assign.station_id}` : 'Unassigned (No Slot)'}
-                      </span>
-                    </div>
-
-                    {/* Visual Bar Track */}
-                    <div className="flex-1 h-8 bg-slate-100/70 border border-slate-200 rounded relative flex items-center">
-                      {/* Deadline Marker */}
-                      <div
-                        style={{ left: `${deadlinePercent}%` }}
-                        className="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-10"
-                        title={`Deadline: ${evVar.departure_deadline}m`}
-                      />
-
-                      {/* Assigned Slot Block */}
-                      {assign && (
-                        <div
-                          style={{
-                            left: `${(assign.start_time / totalDuration) * 100}%`,
-                            width: `${(assign.duration / totalDuration) * 100}%`
-                          }}
-                          className={`absolute top-1 bottom-1 rounded shadow-xs flex items-center justify-center text-[10px] font-bold text-white z-0 ${
-                            isEmergency ? 'bg-rose-600' : 'bg-blue-600'
-                          }`}
-                        >
-                          <span className="truncate px-1 font-mono">
-                            {assign.start_time}m - {assign.start_time + assign.duration}m ({assign.charging_rate_kw}kW)
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="py-8 text-center text-slate-500 text-xs">
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                    <span>Executing Backtracking CSP solver with MRV and AC-3...</span>
-                  </span>
-                ) : (
-                  <span>No variable allocations available for this scenario. Click &ldquo;Execute CSP Solver&rdquo; to schedule.</span>
-                )}
-              </div>
+            {violated.length > 0 && (
+              <Banner variant="warn">
+                <strong>{violated.length} constraint violation(s) were recorded while searching.</strong>{' '}
+                The solver backtracked past them; they are listed below for traceability.
+              </Banner>
             )}
-          </div>
-        </div>
+          </Section>
 
-      </div>
+          {/* Views */}
+          <div className="flex items-center justify-between">
+            <div className="tabs" role="tablist" aria-label="Scheduler view">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'timeline'}
+                onClick={() => setView('timeline')}
+                className="tab"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Timeline
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'assignments'}
+                onClick={() => setView('assignments')}
+                className="tab"
+              >
+                <Table2 className="h-3.5 w-3.5" />
+                Assignments
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'details'}
+                onClick={() => setView('details')}
+                className="tab"
+              >
+                <Info className="h-3.5 w-3.5" />
+                Solver detail
+              </button>
+            </div>
+          </div>
+
+          {view === 'timeline' && (
+            <Section
+              title="Charging timeline"
+              description={`Each bar is one assignment on one charger between 0 and ${TIMELINE_MINUTES} minutes; the amber line marks that vehicle's departure deadline.`}
+            >
+              {variables.length === 0 ? (
+                <StateBlock
+                  variant="empty"
+                  title="No scheduling variables in this scenario"
+                  detail="The scenario produced no vehicle variables to place."
+                />
+              ) : (
+                <div className="ai-card-flat overflow-x-auto p-3">
+                  <div className="min-w-[880px]">
+                    {/* Time axis */}
+                    <div className="flex border-b border-slate-200 pb-2">
+                      <div className="w-52 shrink-0 pr-3">
+                        <span className="kv-term">Vehicle and deadline</span>
+                      </div>
+                      <div className="relative flex flex-1 justify-between px-1">
+                        {timelineLabels().map((t) => (
+                          <span
+                            key={t}
+                            className="font-mono text-2xs font-semibold text-slate-400"
+                          >
+                            {t}m
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {variables.map(([evId, variable]) => {
+                      const assign = assignments[evId];
+                      const deadline = Number(variable.departure_deadline);
+                      const deadlinePercent = Number.isFinite(deadline)
+                        ? Math.min(100, Math.max(0, (deadline / TIMELINE_MINUTES) * 100))
+                        : null;
+                      const start = Number(assign?.start_time_min);
+                      const duration = Number(assign?.duration_min);
+                      const hasBar = Number.isFinite(start) && Number.isFinite(duration) && duration > 0;
+                      const isEmergency = variable.priority === 'EMERGENCY';
+
+                      return (
+                        <div
+                          key={evId}
+                          className="flex items-center border-b border-slate-100 py-2.5 last:border-0"
+                        >
+                          <div className="w-52 shrink-0 pr-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs font-bold text-slate-900">
+                                {evId}
+                              </span>
+                              <span className={isEmergency ? 'badge-rose' : 'badge-blue'}>
+                                {variable.priority}
+                              </span>
+                            </div>
+                            <span className="mt-0.5 block truncate text-2xs text-slate-500">
+                              {assign
+                                ? `${assign.charger_id} · ${assign.power_kw} kW`
+                                : 'No charger assigned'}
+                            </span>
+                          </div>
+
+                          <div className="relative h-8 flex-1 rounded border border-slate-200 bg-slate-50">
+                            {deadlinePercent !== null && (
+                              <div
+                                className="absolute inset-y-0 z-10 w-0.5 bg-amber-500"
+                                style={{ left: `${deadlinePercent}%` }}
+                                title={`Departure deadline ${deadline} min`}
+                              />
+                            )}
+
+                            {hasBar && (
+                              <div
+                                className={`absolute inset-y-1 z-0 flex items-center justify-center rounded text-2xs font-bold text-white ${
+                                  isEmergency ? 'bg-rose-600' : 'bg-blue-600'
+                                }`}
+                                style={{
+                                  left: `${(start / TIMELINE_MINUTES) * 100}%`,
+                                  width: `${(duration / TIMELINE_MINUTES) * 100}%`
+                                }}
+                                title={`${assign.charger_id} · ${start}m to ${start + duration}m at ${assign.power_kw} kW`}
+                              >
+                                <span className="truncate px-1 font-mono">
+                                  {start}–{start + duration}m
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {view === 'assignments' && (
+            <Section
+              title="Assignments"
+              description="The complete schedule the solver returned, one row per vehicle."
+            >
+              {Object.keys(assignments).length === 0 ? (
+                <StateBlock
+                  variant="empty"
+                  title="No feasible assignment"
+                  detail="The solver could not place any vehicle in this scenario."
+                />
+              ) : (
+                <div className="ai-table-container">
+                  <table className="ai-table">
+                    <thead>
+                      <tr>
+                        <th>Vehicle</th>
+                        <th>Priority</th>
+                        <th>Station</th>
+                        <th>Charger</th>
+                        <th className="num">Start</th>
+                        <th className="num">Duration</th>
+                        <th className="num">Power</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(assignments).map(([evId, a]) => (
+                        <tr key={evId}>
+                          <td className="col-code">{evId}</td>
+                          <td>
+                            <span
+                              className={
+                                problemState?.variables?.[evId]?.priority === 'EMERGENCY'
+                                  ? 'badge-rose'
+                                  : 'badge-blue'
+                              }
+                            >
+                              {problemState?.variables?.[evId]?.priority || '—'}
+                            </span>
+                          </td>
+                          <td className="col-code">{a.station_id}</td>
+                          <td className="col-code">{a.charger_id}</td>
+                          <td className="num">{a.start_time_min} min</td>
+                          <td className="num">{a.duration_min} min</td>
+                          <td className="num">{a.power_kw} kW</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {view === 'details' && (
+            <>
+              <Section
+                title="Search statistics"
+                description="Counters recorded by the backtracking search for this run."
+              >
+                <div className="ai-table-container">
+                  <table className="ai-table">
+                    <thead>
+                      <tr>
+                        <th>Counter</th>
+                        <th className="num">Value</th>
+                        <th>Meaning</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ['Domain values generated', stats?.domain_values_generated, 'Candidate (charger, slot) pairs before propagation'],
+                        ['Solutions found', stats?.solutions_found_count, 'Complete assignments that satisfied every constraint'],
+                        ['Maximum search depth', stats?.max_search_depth, 'Deepest partial assignment reached'],
+                        ['Forward-checking prunes', stats?.forward_check_prunes, 'Values removed by forward checking'],
+                        ['Forward-checking wipe-outs', stats?.forward_check_wipeouts, 'Domain emptied, forcing a backtrack'],
+                        ['AC-3 revisions', stats?.ac3_revisions, 'Arc revision operations performed'],
+                        ['AC-3 values examined', stats?.ac3_values_examined, 'Values inspected during arc consistency'],
+                        ['AC-3 values pruned', stats?.ac3_values_pruned, 'Values removed by arc consistency'],
+                        ['Values rejected during ordering', stats?.value_choices_rejected, 'Candidate values skipped by value ordering'],
+                        ['Search budget nodes', stats?.search_budget_nodes, 'Node budget available for this solve'],
+                        ['Search budget exhausted', String(stats?.search_budget_exhausted), 'Whether the budget stopped the search early']
+                      ]
+                        .filter(([, value]) => value !== undefined && value !== null)
+                        .map(([label, value, meaning]) => (
+                          <tr key={label}>
+                            <td className="font-medium text-slate-800">{label}</td>
+                            <td className="num font-mono">{value}</td>
+                            <td className="text-slate-500">{meaning}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ['MRV', stats?.mrv_heuristic_enabled],
+                    ['LCV', stats?.lcv_enabled],
+                    ['Forward checking', stats?.forward_checking_enabled],
+                    ['AC-3', stats?.ac3_enabled]
+                  ].map(([label, enabled]) => (
+                    <span key={label} className={enabled ? 'badge-emerald' : 'badge-slate'}>
+                      {label}: {enabled ? 'enabled' : 'disabled'}
+                    </span>
+                  ))}
+                </div>
+              </Section>
+
+              {utility && (
+                <Section
+                  title="Schedule utility"
+                  description="How the chosen schedule scored against the objective components."
+                >
+                  <div className="ai-table-container">
+                    <table className="ai-table">
+                      <thead>
+                        <tr>
+                          <th>Component</th>
+                          <th className="num">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(utility)
+                          .filter(([key, value]) => key !== 'explanation' && typeof value === 'number')
+                          .map(([key, value]) => (
+                            <tr key={key}>
+                              <td className="text-slate-700">{key.replace(/_/g, ' ')}</td>
+                              <td className="num font-mono">{value.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        <tr className="row-selected">
+                          <td className="font-semibold text-slate-900">Total score</td>
+                          <td className="num font-mono font-bold">{utility.total_score?.toFixed(2)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  {utility.explanation && (
+                    <p className="mt-3 text-xs leading-relaxed text-slate-600">
+                      {utility.explanation}
+                    </p>
+                  )}
+                </Section>
+              )}
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Section
+                  title="Constraints enforced"
+                  description="Constraint classes the solver applied to this problem."
+                >
+                  {(solution.constraints_enforced || []).length === 0 ? (
+                    <StateBlock variant="empty" title="No constraint class reported" />
+                  ) : (
+                    <div className="ai-table-container">
+                      <table className="ai-table">
+                        <thead>
+                          <tr>
+                            <th>Constraint</th>
+                            <th>Implementation</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {solution.constraints_enforced.map((c) => (
+                            <tr key={c.name}>
+                              <td className="font-medium text-slate-800">{c.name}</td>
+                              <td className="col-code">{c.type}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Section>
+
+                <Section
+                  title="Constraints violated during search"
+                  description="Recorded when the solver tried a value and had to undo it."
+                >
+                  {violated.length === 0 ? (
+                    <StateBlock
+                      variant="empty"
+                      title="No violation was recorded"
+                      detail="Propagation removed every infeasible value before it was tried."
+                    />
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {violated.map((line, i) => (
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-2xs leading-relaxed text-amber-900"
+                        >
+                          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Section>
+              </div>
+            </>
+          )}
+        </>
+      ) : !loading && !error ? (
+        <Section title="Solver output">
+          <StateBlock variant="empty" title="No solution was returned" />
+        </Section>
+      ) : null}
 
     </div>
   );

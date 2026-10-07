@@ -1,455 +1,790 @@
 import React, { useState, useEffect } from 'react';
 import {
-  HelpCircle,
-  CheckCircle2,
-  XCircle,
-  ArrowDown,
-  ArrowRight,
   FileText,
+  ShieldCheck,
   Brain,
   Compass,
   Calendar,
   Scale,
   Sparkles,
-  ShieldCheck,
-  ChevronDown,
-  ChevronUp,
-  RotateCcw
+  Layers,
+  RotateCcw,
+  CheckCircle2,
+  XCircle,
+  ArrowRight
 } from 'lucide-react';
 import { executePrimaryWorkflow } from '../../services/api';
+import { PageHeader, Section, StatTile, StateBlock, Banner } from '../common';
+
+const SAMPLE_REQUEST = {
+  ev_id: 'EV-07',
+  current_location: { x: 1.2, y: 2.5 },
+  destination: { x: 8.5, y: 9.0 },
+  destination_area_name: 'Whitefield Tech Hub',
+  battery_capacity_kwh: 60.0,
+  current_charge_pct: 18.0,
+  required_charge_pct: 80.0,
+  max_acceptable_distance_km: 15.0,
+  departure_deadline_min: 90.0,
+  priority: 'STANDARD',
+  connector_requirement: 'CCS2',
+  selected_search_algorithm: 'A*'
+};
+
+/** Renders a value, or an em dash when the backend did not report one. */
+function show(value, digits) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'number') return digits === undefined ? String(value) : value.toFixed(digits);
+  return value;
+}
+
+function stringList(value) {
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined) return [];
+  return [value];
+}
 
 export default function DecisionExplanationView({ onSelectTab }) {
-  const [workflowData, setWorkflowData] = useState(null);
+  const [workflow, setWorkflow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedStep, setExpandedStep] = useState(null);
 
-  const runSampleExplanation = async () => {
+  const run = async () => {
     setLoading(true);
     setError(null);
     try {
-      const sampleReq = {
-        ev_id: 'EV-07',
-        current_location: { x: 1.2, y: 2.5 },
-        destination: { x: 8.5, y: 9.0 },
-        destination_area_name: 'Whitefield Tech Hub',
-        battery_capacity_kwh: 60.0,
-        current_charge_pct: 18.0,
-        required_charge_pct: 80.0,
-        max_acceptable_distance_km: 15.0,
-        departure_deadline_min: 90.0,
-        priority: 'STANDARD',
-        connector_requirement: 'CCS2',
-        selected_search_algorithm: 'A*'
-      };
-      const res = await executePrimaryWorkflow(sampleReq);
-      setWorkflowData(res);
+      setWorkflow(await executePrimaryWorkflow(SAMPLE_REQUEST));
     } catch (err) {
-      console.error('Failed to run explanation workflow', err);
-      setError(err.message || 'Failed to execute decision explanation pipeline.');
+      console.error('Failed to run the decision workflow', err);
+      setWorkflow(null);
+      setError(err.message || 'The decision pipeline could not be executed.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    runSampleExplanation();
+    run();
   }, []);
 
-  const s1 = workflowData?.step1_request;
-  const s2 = workflowData?.step2_formulation;
-  const s3 = workflowData?.step3_reasoning || workflowData?.step3_knowledge;
-  const s4 = workflowData?.step4_search || workflowData?.step4_search_comparison;
-  const s5 = workflowData?.step5_csp || workflowData?.step5_csp_scheduling;
-  const s6 = workflowData?.step6_conflict_resolution || workflowData?.step6_conflict;
-  const s7 = workflowData?.step7_final_decision;
+  const s1 = workflow?.step1_request;
+  const s2 = workflow?.step2_formulation;
+  const s3 = workflow?.step3_reasoning;
+  const s4 = workflow?.step4_search;
+  const s5 = workflow?.step5_csp;
+  const s6 = workflow?.step6_conflict_resolution;
+  const s7 = workflow?.step7_final_decision;
+  const s8 = workflow?.step8_explanation;
 
-  const flowSteps = [
-    {
-      step: 1,
-      id: 'request',
-      title: 'User Request',
-      subtitle: 'Vehicle Telematics & Constraints',
-      icon: FileText,
-      badge: 'Input',
-      content: s1 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>
-            Vehicle <strong>{s1.ev_id}</strong> submitted a charging dispatch request from{' '}
-            <code>({s1.current_location?.x}, {s1.current_location?.y})</code> heading toward{' '}
-            <strong>{s1.destination_area_name || s1.destination_area}</strong>.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[11px]">
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-              Current SOC: <strong>{s1.current_charge_pct}%</strong>
-            </div>
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-              Energy Deficit: <strong>{s1.energy_needed_kwh || '37.2'} kWh</strong>
-            </div>
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-              Deadline: <strong>{s1.departure_deadline_min} min</strong>
-            </div>
-            <div className="p-2 bg-slate-50 border border-slate-200 rounded">
-              Connector: <strong>{s1.connector_requirement}</strong>
-            </div>
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 2,
-      id: 'facts',
-      title: 'Asserted Facts',
-      subtitle: 'Ground Truths in the Knowledge Base',
-      icon: ShieldCheck,
-      badge: 'Percepts',
-      content: s3 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>The system perceived and validated the following ground-truth statements from the environment:</p>
-          <div className="space-y-1.5 font-mono text-[11px]">
-            {(s3.facts_evaluated || s3.facts_asserted || [
-              'EmergencyVehicle(EV-09) == False',
-              'BatteryReserveCritical(EV-07) == True',
-              'ConnectorMatch(EV-07, CCS2) == True',
-              'StationStatus(CS-02) == AVAILABLE'
-            ]).slice(0, 4).map((f, i) => (
-              <div key={i} className="p-2 bg-slate-50 border border-slate-200 rounded flex items-center gap-2">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span>{typeof f === 'string' ? f : JSON.stringify(f)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 3,
-      id: 'rules',
-      title: 'Inference Rules',
-      subtitle: 'First-Order Horn Clause Deduction',
-      icon: Brain,
-      badge: 'Logic Reasoning',
-      content: s3 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>Forward chaining applied production rules to derive higher-level decision facts:</p>
-          <div className="space-y-1.5 font-mono text-[11px]">
-            {(s3.rules_triggered || s3.rules_applied || [
-              { rule_id: 'R1-PRIORITY', description: 'IF CurrentSOC < 20% THEN Assert Priority=HIGH', outcome: 'Priority escalated' },
-              { rule_id: 'R2-SAFETY', description: 'IF Plug(EV) == Socket(Bay) THEN Assert Compatible', outcome: 'Socket approved' }
-            ]).map((r, i) => (
-              <div key={i} className="p-2 bg-blue-50/50 border border-blue-200 rounded text-blue-900">
-                <strong>{r.rule_id || `Rule-${i + 1}`}:</strong> {r.description || r.rule_name} &rarr; <em>{r.outcome || r.consequent}</em>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 4,
-      id: 'search',
-      title: 'Graph Search & Routing',
-      subtitle: 'Informed A* vs Uninformed Baseline Pruning',
-      icon: Compass,
-      badge: 'Search',
-      content: s4 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>
-            Evaluated road network paths using <strong>A* Search ($f = g + h$)</strong>. Admissible Euclidean distance{' '}
-            $h(n) \le h^*(n)$ guaranteed an optimal path while expanding significantly fewer nodes than BFS and UCS:
-          </p>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded text-xs space-y-1">
-            <div>
-              Optimal Path Selected: <strong className="font-mono text-blue-700">{(s4.optimal_path || s4.best_path || ['WAYPOINT-NORTH', 'CS-02']).join(' → ')}</strong>
-            </div>
-            <div>
-              Travel Distance: <strong>{s4.travel_cost_km || s4.path_cost || 4.2} km</strong> • 
-              Nodes Explored: <strong>{s4.nodes_explored || s4.nodes_expanded || 8}</strong> • 
-              Runtime: <strong>{s4.runtime_ms || s4.execution_time_ms || 1.4} ms</strong>
-            </div>
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 5,
-      id: 'constraints',
-      title: 'Constraint Verification (CSP)',
-      subtitle: 'Arc Consistency & Variable Bounds',
-      icon: Calendar,
-      badge: 'Constraints',
-      content: s5 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>Constraint Satisfaction Problem formulation strictly enforced all operational bounds:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-900 flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Non-Overlapping Bay: Assigned Bay {s5.assigned_bay || s5.bay_id || 'BAY-1'} has zero collisions</span>
-            </div>
-            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-900 flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Deadline Enforced: Finish at {s5.finish_time || '45'}m &le; 90m deadline</span>
-            </div>
-            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-900 flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Grid Feeder Safe: Current draw within transformer limit</span>
-            </div>
-            <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-900 flex items-center gap-2">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Connector Compatible: CCS2 socket hardware locked</span>
-            </div>
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 6,
-      id: 'conflict',
-      title: 'Conflict Resolution',
-      subtitle: 'Nash Bargaining & Pareto Optimality',
-      icon: Scale,
-      badge: 'Game Theory',
-      content: s6 ? (
-        <div className="space-y-2 text-xs text-slate-700">
-          <p>
-            When multi-vehicle demand overlapped at the central hub, cooperative game theory computed the Nash Bargaining 
-            Product over all Pareto-efficient actions:
-          </p>
-          <div className="p-3 bg-blue-50/40 border border-blue-200 rounded text-xs space-y-1">
-            <div>
-              Equilibrium Compromise: <strong>{s6.selected_alternative || s6.alternative_chosen || 'Compromise Slot Shift'}</strong>
-            </div>
-            <div className="text-slate-600">
-              Nash Bargaining Product: <strong className="font-mono text-blue-700">{s6.nash_product || s6.nash_bargaining_product || '3,420'}</strong> • 
-              Pareto Efficient: <strong className="text-emerald-700">YES</strong>
-            </div>
-          </div>
-        </div>
-      ) : null
-    },
-    {
-      step: 7,
-      id: 'decision',
-      title: 'Final Decision',
-      subtitle: 'Optimal Dispatch & Resource Allocation',
-      icon: Sparkles,
-      badge: 'Output',
-      content: s7 ? (
-        <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-lg space-y-3 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-900 text-sm">
-              Recommended Station: {s7.recommended_station_name || s7.recommended_station?.name || 'Central Metro Hub'} ({s7.recommended_station_id || s7.recommended_station?.id || 'CS-02'})
-            </span>
-            <span className="badge-emerald font-semibold">100% CONSTRAINTS SATISFIED</span>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono">
-            <div className="p-2 bg-white border border-emerald-200 rounded">
-              <span className="text-[10px] text-slate-500 block font-sans uppercase">Assigned Bay</span>
-              <strong className="text-slate-900 text-sm">{s7.assigned_bay_id || 'BAY-1'}</strong>
-            </div>
-            <div className="p-2 bg-white border border-emerald-200 rounded">
-              <span className="text-[10px] text-slate-500 block font-sans uppercase">Time Slot</span>
-              <strong className="text-slate-900 text-sm">{s7.recommended_time_slot || '00:15 - 00:45'}</strong>
-            </div>
-            <div className="p-2 bg-white border border-emerald-200 rounded">
-              <span className="text-[10px] text-slate-500 block font-sans uppercase">Expected Wait</span>
-              <strong className="text-slate-900 text-sm">{s7.expected_waiting_time_min ?? 0}m</strong>
-            </div>
-            <div className="p-2 bg-white border border-emerald-200 rounded">
-              <span className="text-[10px] text-slate-500 block font-sans uppercase">Estimated Cost</span>
-              <strong className="text-blue-700 text-sm">${(s7.total_cost_usd || 14.20).toFixed(2)}</strong>
-            </div>
-          </div>
-        </div>
-      ) : null
-    }
-  ];
+  const rejected = (s4?.algorithms_compared || []).filter((a) => !a.selected);
+  const constraintStatus = s7?.constraint_status || {};
 
   return (
-    <div className="space-y-6">
-      
-      {/* Top Banner: Academic Context */}
-      <div className="ai-card p-5 bg-gradient-to-r from-blue-50/40 via-white to-slate-50 border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="badge-blue">EXPLAINABLE ARTIFICIAL INTELLIGENCE (XAI)</span>
-              <span className="text-xs text-slate-500 font-mono">END-TO-END REASONING TRACE</span>
-            </div>
-            <h2 className="text-xl font-bold text-slate-900 mt-1">
-              Transparent Decision Explanation &amp; Rejection Audit
-            </h2>
-            <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-              Step-by-step mathematical and logical justification explaining why the recommended station and schedule 
-              were selected, and why every other candidate was rejected.
-            </p>
-          </div>
+    <div className="page">
 
-          <button
-            onClick={runSampleExplanation}
-            disabled={loading}
-            className="btn-primary text-xs flex items-center gap-1.5 self-start md:self-center shadow-xs"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Re-Trace Decision</span>
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Pipeline · stage 9"
+        title="Decision explanation and rejection audit"
+        description="The full reasoning record for one request: what was asserted, which rules fired, what each search algorithm returned, how the schedule was constrained, how the conflict was arbitrated, and what was finally decided."
+        actions={
+          <>
+            <button type="button" onClick={run} disabled={loading} className="btn-primary">
+              <RotateCcw className="h-4 w-4" />
+              {loading ? 'Running…' : 'Re-run trace'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab('ev_request')}
+              className="btn-secondary"
+            >
+              New request
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </>
+        }
+      />
 
-      {/* Error Alert Banner */}
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center justify-between gap-3">
-          <span><strong>Explanation Pipeline Error:</strong> {error}</span>
-          <button
-            onClick={runSampleExplanation}
-            className="btn-secondary text-xs px-2.5 py-1 shrink-0"
-          >
-            Retry Trace
-          </button>
-        </div>
+        <Banner
+          variant="error"
+          action={
+            <button type="button" onClick={run} className="btn-secondary btn-sm">
+              Retry
+            </button>
+          }
+        >
+          <strong>Explanation pipeline failed.</strong> {error}
+        </Banner>
       )}
 
-      {/* Main Flow: User Request ↓ Facts ↓ Rules ↓ Search ↓ Constraints ↓ Conflict Resolution ↓ Final Decision */}
-      <div className="ai-card p-6 space-y-4">
-        <h3 className="text-sm font-bold text-slate-900 mb-2">
-          End-to-End Decision Cascade Trace
-        </h3>
+      {loading && !workflow && (
+        <Section title="Running the pipeline">
+          <StateBlock
+            variant="loading"
+            title="Executing search, scheduling, logic and game stages"
+            detail="This view performs a real end-to-end run; the results below appear once it finishes."
+          />
+        </Section>
+      )}
 
-        <div className="space-y-3">
-          {flowSteps.map((st, index) => {
-            const Icon = st.icon;
-            const isExpanded = expandedStep === st.id || expandedStep === null;
+      {workflow && (
+        <>
+          {/* Run identity + headline metrics */}
+          <Section
+            title="Run record"
+            description="Identifiers and measured cost of the run that produced this explanation."
+          >
+            <div className="stat-grid">
+              <StatTile label="Workflow ID" value={workflow.workflow_id} size="sm" hint="Identifier of this end-to-end run" />
+              <StatTile label="Decision ID" value={workflow.decision_id} size="sm" hint="Key of the stored explanation record" />
+              <StatTile
+                label="Pipeline runtime"
+                value={show(workflow.execution_time_ms, 1)}
+                unit="ms"
+                tone="primary"
+              />
+              <StatTile
+                label="Decision score"
+                value={show(s7?.decision_confidence_score, 1)}
+                unit={s7?.decision_confidence_score !== undefined ? '/100' : undefined}
+                tone="success"
+                hint={s7?.score_formula || 'Composite score produced by the decision stage'}
+              />
+            </div>
+          </Section>
 
-            return (
-              <div key={st.id} className="relative">
-                {/* Step Card */}
-                <div className="ai-card p-4 hover:border-blue-300 transition-colors">
-                  <div
-                    onClick={() => setExpandedStep(expandedStep === st.id ? null : st.id)}
-                    className="flex items-center justify-between cursor-pointer"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs font-mono">
-                        {st.step}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-bold text-slate-900">{st.title}</h4>
-                          <span className="badge-slate text-[10px] font-mono">{st.badge}</span>
-                        </div>
-                        <p className="text-xs text-slate-500">{st.subtitle}</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="p-1 text-slate-400 hover:text-slate-600"
-                      aria-label="Expand step"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  {/* Collapsible Content */}
-                  {isExpanded && st.content && (
-                    <div className="mt-3 pt-3 border-t border-slate-100">
-                      {st.content}
-                    </div>
-                  )}
+          {/* Stage 1 - request */}
+          <StageCard
+            step="01"
+            icon={FileText}
+            title="Request received"
+            subtitle="What the user asked for"
+          >
+            {s1 ? (
+              <>
+                <p className="text-xs leading-relaxed text-slate-600">
+                  Vehicle <strong className="text-slate-900">{s1.ev_id}</strong> starting at (
+                  {show(s1.current_location?.x, 1)}, {show(s1.current_location?.y, 1)}) travelling to{' '}
+                  <strong className="text-slate-900">{show(s1.destination_area)}</strong> at (
+                  {show(s1.destination?.x, 1)}, {show(s1.destination?.y, 1)}).
+                </p>
+                <div className="stat-grid">
+                  <StatTile label="Current SOC" value={show(s1.current_charge_pct, 0)} unit="%" size="sm" />
+                  <StatTile label="Target SOC" value={show(s1.required_charge_pct, 0)} unit="%" size="sm" />
+                  <StatTile
+                    label="Energy required"
+                    value={show(s1.energy_needed_kwh, 1)}
+                    unit="kWh"
+                    size="sm"
+                    hint={`Battery capacity ${show(s1.battery_capacity_kwh, 0)} kWh`}
+                  />
+                  <StatTile
+                    label="Deadline"
+                    value={show(s1.departure_deadline_min, 0)}
+                    unit="min"
+                    size="sm"
+                    hint={`Priority ${show(s1.priority)} · connector ${show(s1.connector_requirement)}`}
+                  />
                 </div>
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
 
-                {/* Downward Connector Arrow */}
-                {index < flowSteps.length - 1 && (
-                  <div className="flex justify-center my-1">
-                    <ArrowDown className="w-4 h-4 text-slate-300" />
+          {/* Stage 2 - formulation */}
+          <StageCard
+            step="02"
+            icon={Layers}
+            title="Problem formulation"
+            subtitle="Search problem the engine built from the request"
+          >
+            {s2 ? (
+              <>
+                <p className="text-xs leading-relaxed text-slate-600">{show(s2.problem_type)}</p>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div className="rounded-md border border-slate-200 p-3">
+                    <span className="kv-term">Initial state</span>
+                    <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed text-slate-700">
+                      {JSON.stringify(s2.initial_state, null, 1)}
+                    </pre>
+                  </div>
+                  <div className="rounded-md border border-slate-200 p-3">
+                    <span className="kv-term">Goal test</span>
+                    <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed text-slate-700">
+                      {JSON.stringify(s2.goal_state, null, 1)}
+                    </pre>
+                  </div>
+                </div>
+                {stringList(s2.actions).length > 0 && (
+                  <div>
+                    <span className="kv-term">Action space</span>
+                    <ul className="mt-1.5 space-y-1">
+                      {stringList(s2.actions).map((a) => (
+                        <li key={a} className="font-mono text-2xs leading-relaxed text-slate-600">
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
+                {s2.state_space_description && (
+                  <p className="rounded-md bg-slate-50 p-3 font-mono text-2xs leading-relaxed text-slate-600">
+                    {s2.state_space_description}
+                  </p>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 3 - facts and rules */}
+          <StageCard
+            step="03"
+            icon={ShieldCheck}
+            title="Facts asserted and rules fired"
+            subtitle="Knowledge base state before the algorithms ran"
+          >
+            {s3 ? (
+              <>
+                <div className="stat-grid">
+                  <StatTile
+                    label="Facts asserted"
+                    value={(s3.facts_asserted || []).length}
+                    size="sm"
+                    hint="Read from the request, the simulation and the station dataset"
+                  />
+                  <StatTile
+                    label="Rules evaluated"
+                    value={(s3.rules_evaluated || []).length}
+                    size="sm"
+                  />
+                  <StatTile
+                    label="Rules fired"
+                    value={(s3.rules_fired || []).length}
+                    size="sm"
+                    tone="success"
+                    hint={stringList(s3.rules_fired).join(', ') || 'No rule antecedent was satisfied'}
+                  />
+                  <StatTile
+                    label="Computed priority"
+                    value={show(s3.computed_priority)}
+                    size="sm"
+                    hint="Derived by inference, not taken verbatim from the request"
+                  />
+                </div>
+
+                {s3.explanation && (
+                  <p className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-700">
+                    {s3.explanation}
+                  </p>
+                )}
+
+                {(s3.facts_asserted || []).length > 0 && (
+                  <div className="ai-table-container">
+                    <table className="ai-table">
+                      <thead>
+                        <tr>
+                          <th>Subject</th>
+                          <th>Predicate</th>
+                          <th>Value</th>
+                          <th>Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s3.facts_asserted.map((f, i) => (
+                          <tr key={`${f.subject}-${f.predicate}-${i}`}>
+                            <td className="col-code">{f.subject}</td>
+                            <td className="col-code">{f.predicate}</td>
+                            <td className="font-medium text-slate-800">{show(f.value)}</td>
+                            <td>
+                              <span className="badge-slate">{f.source}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 4 - search */}
+          <StageCard
+            step="04"
+            icon={Compass}
+            title="Search over the charging network"
+            subtitle="Every algorithm was run on the same graph"
+          >
+            {s4 ? (
+              <>
+                <p className="text-xs leading-relaxed text-slate-600">{s4.explanation}</p>
+                <div className="ai-table-container">
+                  <table className="ai-table">
+                    <thead>
+                      <tr>
+                        <th>Algorithm</th>
+                        <th className="num">Path cost</th>
+                        <th className="num">Nodes expanded</th>
+                        <th className="num">Heuristic</th>
+                        <th className="num">Runtime</th>
+                        <th className="col-center">Outcome</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(s4.algorithms_compared || []).map((a) => (
+                        <tr key={a.algorithm} className={a.selected ? 'row-selected' : ''}>
+                          <td className="font-semibold text-slate-900">{a.algorithm}</td>
+                          <td className="num">{show(a.path_cost, 4)}</td>
+                          <td className="num">{show(a.nodes_explored)}</td>
+                          <td className="num">{a.heuristic_value === null ? 'n/a' : show(a.heuristic_value, 3)}</td>
+                          <td className="num">{show(a.runtime_ms, 2)} ms</td>
+                          <td className="col-center">
+                            {a.selected ? (
+                              <span className="badge-emerald">Selected</span>
+                            ) : (
+                              <span className="badge-slate">Not selected</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <div className="rounded-md border border-slate-200 p-3">
+                    <span className="kv-term">Chosen path</span>
+                    <p className="mt-1 break-words font-mono text-xs text-slate-800">
+                      {stringList(s4.chosen_path).join(' → ') || '—'}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-slate-200 p-3">
+                    <span className="kv-term">Chosen station</span>
+                    <p className="mt-1 text-xs text-slate-800">
+                      {show(s4.chosen_station_name)}{' '}
+                      <span className="col-code">{show(s4.chosen_station_id)}</span>
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 5 - CSP */}
+          <StageCard
+            step="05"
+            icon={Calendar}
+            title="Schedule constraints enforced"
+            subtitle="Variables, domains and the assignment the solver returned"
+          >
+            {s5 ? (
+              <>
+                <div className="stat-grid">
+                  <StatTile
+                    label="Variables"
+                    value={(s5.variables || []).length}
+                    size="sm"
+                    hint="Vehicles the solver had to place"
+                  />
+                  <StatTile
+                    label="Domain values"
+                    value={show(s5.domain_values_generated)}
+                    size="sm"
+                    hint={`${show(s5.solutions_found_count)} complete solution(s) found`}
+                  />
+                  <StatTile
+                    label="Backtracks"
+                    value={show(s5.backtracks_count)}
+                    size="sm"
+                    tone={s5.backtracking_used ? 'warning' : 'success'}
+                    hint={s5.backtracking_used ? 'Search had to undo partial assignments' : 'No backtracking was required'}
+                  />
+                  <StatTile
+                    label="Constraint checks"
+                    value={show(s5.constraint_checks_count)}
+                    size="sm"
+                    hint={`AC-3 examined ${show(s5.ac3_values_examined)} values and pruned ${show(s5.ac3_values_pruned)}`}
+                  />
+                </div>
+
+                {s5.assigned_schedule && (
+                  <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3">
+                    <span className="kv-term">Assignment for this request</span>
+                    <div className="kv-grid mt-1.5">
+                      {Object.entries(s5.assigned_schedule).map(([key, value]) => (
+                        <div key={key}>
+                          <dt className="kv-term">{key}</dt>
+                          <dd className="kv-value font-mono">{show(value)}</dd>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {s5.utility_breakdown && (
+                  <div className="ai-table-container">
+                    <table className="ai-table">
+                      <thead>
+                        <tr>
+                          <th>Penalty component</th>
+                          <th className="num">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(s5.utility_breakdown).map(([key, value]) => (
+                          <tr key={key}>
+                            <td className="text-slate-700">
+                              {key.replace(/_/g, ' ')}
+                            </td>
+                            <td className="num font-mono">{show(value, 2)}</td>
+                          </tr>
+                        ))}
+                        <tr className="row-selected">
+                          <td className="font-semibold text-slate-900">Total utility score</td>
+                          <td className="num font-mono font-bold">{show(s5.utility_score, 2)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {s5.explanation && (
+                  <p className="text-xs leading-relaxed text-slate-600">{s5.explanation}</p>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 6 - conflict */}
+          <StageCard
+            step="06"
+            icon={Scale}
+            title="Conflict resolution"
+            subtitle="Competition for a bay, and how it was arbitrated"
+          >
+            {s6 ? (
+              <>
+                {s6.conflict_detected ? (
+                  <Banner variant="warn">
+                    <strong>Resource contention detected.</strong> {show(s6.contested_resource)}
+                    {s6.competing_ev_id ? ` is also required by ${s6.competing_ev_id}.` : ''}
+                  </Banner>
+                ) : (
+                  <Banner variant="ok">
+                    No contention was detected for the selected resource in this run.
+                  </Banner>
+                )}
+
+                <div className="stat-grid">
+                  <StatTile
+                    label="Decision method"
+                    value={s6.decision_method ? 'Nash bargaining' : 'n/a'}
+                    size="sm"
+                    hint={s6.decision_method}
+                  />
+                  <StatTile label="Selected alternative" value={show(s6.selected_alternative_id)} size="sm" />
+                  <StatTile
+                    label="Nash product"
+                    value={show(s6.nash_product, 2)}
+                    size="sm"
+                    tone="primary"
+                    hint="Product of gains over each agent's disagreement point"
+                  />
+                  <StatTile
+                    label="Pareto efficient"
+                    value={s6.is_pareto_efficient ? 'Yes' : 'No'}
+                    size="sm"
+                    tone={s6.is_pareto_efficient ? 'success' : 'warning'}
+                  />
+                </div>
+
+                {(s6.alternatives_evaluated || []).length > 0 && (
+                  <div className="ai-table-container">
+                    <table className="ai-table">
+                      <thead>
+                        <tr>
+                          <th>Alternative</th>
+                          <th className="num">EV agent</th>
+                          <th className="num">Station agent</th>
+                          <th className="num">Grid agent</th>
+                          <th className="num">Energy agent</th>
+                          <th className="col-center">Chosen</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {s6.alternatives_evaluated.map((alt) => {
+                          const u = alt.utilities || {};
+                          const isChosen = alt.alternative_id === s6.selected_alternative_id;
+                          return (
+                            <tr key={alt.alternative_id} className={isChosen ? 'row-selected' : ''}>
+                              <td>
+                                <div className="font-medium text-slate-900">
+                                  {alt.alternative_title || alt.alternative_id}
+                                </div>
+                                <div className="col-code">{alt.alternative_id}</div>
+                              </td>
+                              <td className="num font-mono">{show(u.EV_AGENT, 1)}</td>
+                              <td className="num font-mono">{show(u.STATION_AGENT, 1)}</td>
+                              <td className="num font-mono">{show(u.GRID_AGENT, 1)}</td>
+                              <td className="num font-mono">{show(u.ENERGY_AGENT, 1)}</td>
+                              <td className="col-center">
+                                {isChosen ? (
+                                  <span className="badge-emerald">Chosen</span>
+                                ) : (
+                                  <span className="badge-slate">Rejected</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {s6.rational_justification && (
+                  <p className="text-xs leading-relaxed text-slate-600">{s6.rational_justification}</p>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 7 - final decision */}
+          <StageCard
+            step="07"
+            icon={Sparkles}
+            title="Final decision"
+            subtitle="What the system actually recommends"
+          >
+            {s7 ? (
+              <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="kv-term">Recommended station</span>
+                      <p className="mt-0.5 text-base font-bold text-slate-900">
+                        {show(s7.recommended_station?.station_name)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-600">
+                        {show(s7.recommended_station?.station_id)} ·{' '}
+                        {show(s7.recommended_station?.operator)} ·{' '}
+                        {show(s7.recommended_station?.distance_km, 2)} km away
+                      </p>
+                    </div>
+                    <span className="badge-emerald">
+                      Score {show(s7.decision_confidence_score, 1)}/100
+                    </span>
+                  </div>
+
+                  <p className="mt-3 break-words font-mono text-2xs text-slate-600">
+                    Route: {stringList(s7.recommended_route).join(' → ') || '—'}
+                  </p>
+                </div>
+
+                <div className="stat-grid">
+                  <StatTile label="Time slot" value={show(s7.recommended_time_slot)} size="sm" />
+                  <StatTile
+                    label="Expected wait"
+                    value={show(s7.expected_waiting_time_min, 1)}
+                    unit="min"
+                    size="sm"
+                  />
+                  <StatTile
+                    label="Charging duration"
+                    value={show(s7.estimated_charging_duration_min, 0)}
+                    unit="min"
+                    size="sm"
+                  />
+                  <StatTile
+                    label="Station data source"
+                    value={show(s7.recommended_station?.data_source)}
+                    size="sm"
+                    hint="Provenance of the station metadata"
+                  />
+                </div>
+
+                {Object.keys(constraintStatus).length > 0 && (
+                  <div className="space-y-2">
+                    <span className="kv-term">Constraint verdicts</span>
+                    {Object.entries(constraintStatus).map(([name, verdict]) => {
+                      const passed = String(verdict).toUpperCase().startsWith('PASSED');
+                      return (
+                        <div
+                          key={name}
+                          className="flex items-start gap-2 rounded-md border border-slate-200 p-3"
+                        >
+                          {passed ? (
+                            <CheckCircle2 className="mt-px h-4 w-4 shrink-0 text-emerald-600" />
+                          ) : (
+                            <XCircle className="mt-px h-4 w-4 shrink-0 text-rose-600" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-800">
+                              {name.replace(/_/g, ' ')}
+                            </p>
+                            <p className="mt-0.5 text-2xs leading-relaxed text-slate-600">
+                              {String(verdict)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {s7.reasoning_explanation && (
+                  <p className="text-xs leading-relaxed text-slate-600">
+                    {s7.reasoning_explanation}
+                  </p>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Stage 8 - narrative explanation */}
+          <StageCard
+            step="08"
+            icon={Brain}
+            title="Explanation"
+            subtitle="The same reasoning expressed in plain language"
+          >
+            {s8 ? (
+              <>
+                <p className="text-sm font-semibold text-slate-900">{show(s8.prompt)}</p>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {[
+                    ['Facts', s8.facts_tier],
+                    ['Rules', s8.rules_tier],
+                    ['Search', s8.search_tier],
+                    ['Constraints', s8.constraints_tier],
+                    ['Decision', s8.decision_tier]
+                  ].map(([label, tier]) => (
+                    <div key={label} className="rounded-md border border-slate-200 p-3">
+                      <span className="kv-term">{label}</span>
+                      {stringList(tier).length === 0 ? (
+                        <p className="mt-1 text-2xs text-slate-400">Not reported for this run.</p>
+                      ) : (
+                        <ul className="mt-1.5 space-y-1">
+                          {stringList(tier).map((line) => (
+                            <li
+                              key={line}
+                              className="text-2xs leading-relaxed text-slate-600"
+                            >
+                              {line}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {stringList(s8.derivation_chain).length > 0 && (
+                  <div>
+                    <span className="kv-term">Derivation chain</span>
+                    <ol className="mt-2 space-y-1.5 border-l-2 border-slate-200 pl-4">
+                      {stringList(s8.derivation_chain).map((line, i) => (
+                        <li key={i} className="relative text-2xs leading-relaxed text-slate-600">
+                          <span className="absolute -left-[1.32rem] top-1.5 h-2 w-2 rounded-full bg-blue-500" />
+                          {line}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </>
+            ) : (
+              <StateBlock variant="info" title="Not reported by this run" />
+            )}
+          </StageCard>
+
+          {/* Rejection audit */}
+          <Section
+            title="Rejection audit"
+            description="What was considered and set aside, with the measurement that decided it."
+          >
+            {rejected.length === 0 ? (
+              <StateBlock
+                variant="empty"
+                title="No alternative was rejected in this run"
+                detail="Every compared algorithm returned the same selected path."
+              />
+            ) : (
+              <div className="ai-table-container">
+                <table className="ai-table">
+                  <thead>
+                    <tr>
+                      <th>Rejected option</th>
+                      <th className="num">Path cost</th>
+                      <th className="num">Nodes expanded</th>
+                      <th>Reason it was not selected</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rejected.map((a) => {
+                      const cost = Number(a.path_cost);
+                      const chosenCost = Number(s4?.chosen_path_cost);
+                      let reason = 'Returned a higher path cost than the selected algorithm.';
+                      if (Number.isFinite(cost) && Number.isFinite(chosenCost)) {
+                        if (cost === chosenCost) {
+                          reason = `Found the same optimal cost (${cost.toFixed(4)}) but expanded more nodes, so it was not preferred.`;
+                        } else if (cost > chosenCost) {
+                          reason = `Path cost ${cost.toFixed(4)} is higher than the selected ${chosenCost.toFixed(4)}.`;
+                        }
+                      }
+                      return (
+                        <tr key={a.algorithm}>
+                          <td className="font-semibold text-slate-900">{a.algorithm}</td>
+                          <td className="num">{show(a.path_cost, 4)}</td>
+                          <td className="num">{show(a.nodes_explored)}</td>
+                          <td className="text-slate-600">{reason}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Counterfactual Station Rejections Table */}
-      <div className="ai-card p-5 space-y-4">
-        <div className="border-b border-slate-200 pb-3">
-          <h3 className="text-sm font-bold text-slate-900">
-            Counterfactual Rejection Audit: Why Other Stations Were Rejected
-          </h3>
-          <p className="text-xs text-slate-500">
-            Explicit deterministic justification for each candidate station eliminated during reasoning
-          </p>
-        </div>
-
-        <div className="ai-table-container">
-          <table className="ai-table">
-            <thead>
-              <tr>
-                <th>Candidate Station</th>
-                <th>Distance</th>
-                <th>Connector Check</th>
-                <th>Grid Headroom</th>
-                <th>Resolution Status</th>
-                <th>Formal Reason for Rejection / Deprioritization</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-emerald-50/40">
-                <td className="font-bold text-slate-900">CS-02 (Central Metro Hub)</td>
-                <td className="font-mono text-xs">4.2 km</td>
-                <td><span className="badge-emerald">Compatible CCS2</span></td>
-                <td><span className="badge-emerald">180 kW Free</span></td>
-                <td><span className="badge-emerald font-bold">SELECTED</span></td>
-                <td className="text-xs text-emerald-900 font-medium">
-                  Optimal A* path cost ($14.20) + zero bay contention under Nash Bargaining.
-                </td>
-              </tr>
-              <tr>
-                <td className="font-bold text-slate-900">CS-01 (Tech Park Hub)</td>
-                <td className="font-mono text-xs">6.8 km</td>
-                <td><span className="badge-emerald">Compatible CCS2</span></td>
-                <td><span className="badge-emerald">120 kW Free</span></td>
-                <td><span className="badge-rose">REJECTED</span></td>
-                <td className="text-xs text-slate-600">
-                  Suboptimal path cost: A* evaluation proved travel distance is 2.6 km longer than CS-02.
-                </td>
-              </tr>
-              <tr>
-                <td className="font-bold text-slate-900">CS-03 (East Ring Station)</td>
-                <td className="font-mono text-xs">8.5 km</td>
-                <td><span className="badge-emerald">Compatible CCS2</span></td>
-                <td><span className="badge-rose">OVERLOADED</span></td>
-                <td><span className="badge-rose">REJECTED</span></td>
-                <td className="text-xs text-slate-600">
-                  Grid safety violation: Substation transformer load currently exceeds safety threshold by 40 kW.
-                </td>
-              </tr>
-              <tr>
-                <td className="font-bold text-slate-900">CS-04 (Airport Expressway)</td>
-                <td className="font-mono text-xs">16.4 km</td>
-                <td><span className="badge-emerald">Compatible CCS2</span></td>
-                <td><span className="badge-emerald">220 kW Free</span></td>
-                <td><span className="badge-rose">REJECTED</span></td>
-                <td className="text-xs text-slate-600">
-                  Exceeds user maximum search radius of 15.0 km; filtered during initial spatial pruning.
-                </td>
-              </tr>
-              <tr>
-                <td className="font-bold text-slate-900">CS-05 (Southern Depot)</td>
-                <td className="font-mono text-xs">5.1 km</td>
-                <td><span className="badge-rose">CHAdeMO Only</span></td>
-                <td><span className="badge-emerald">90 kW Free</span></td>
-                <td><span className="badge-rose">REJECTED</span></td>
-                <td className="text-xs text-slate-600">
-                  Rule-Connector-Compatibility violation: EV requires CCS2 fast-charge socket; CS-05 has only CHAdeMO.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+            )}
+          </Section>
+        </>
+      )}
 
     </div>
+  );
+}
+
+/** One numbered stage of the cascade, with a consistent header block. */
+function StageCard({ step, icon: Icon, title, subtitle, children }) {
+  return (
+    <section className="ai-card section">
+      <div className="section-head">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 font-mono text-2xs font-bold text-slate-500">
+            {step}
+          </span>
+          <div className="min-w-0">
+            <h2 className="section-title">
+              <Icon className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="truncate">{title}</span>
+            </h2>
+            {subtitle && <p className="section-desc">{subtitle}</p>}
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
   );
 }

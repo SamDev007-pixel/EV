@@ -21,7 +21,7 @@ class LocalSearchResult(BaseModel):
 
 class LocalSearchOptimizer:
     """
-    Unit II: Local Search & Optimization.
+    Local search and optimization (hill climbing and simulated annealing).
     Solves 24-hour microgrid aggregate power schedule optimization:
     Goal: Minimize peak load and smooth the load curve (minimizing variance & peak-to-average ratio).
     """

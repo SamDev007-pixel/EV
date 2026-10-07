@@ -1,7 +1,6 @@
 """
 AND-OR Graph Search for Nondeterministic Problem Spaces.
-FOAI Unit II: Search in Partially Observable and Nondeterministic Environments.
-Russell & Norvig, Artificial Intelligence: A Modern Approach (Chapter 4.3).
+AND-OR graph search for nondeterministic contingency planning.
 
 In real-world EV charging scenarios, navigation and charging actions have
 contingent outcomes:

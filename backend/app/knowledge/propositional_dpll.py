@@ -36,7 +36,7 @@ class DPLLResult(BaseModel):
 
 class DPLLSolver:
     """
-    Unit IV: Propositional Logic Theorem Prover & Model Checking.
+    Propositional satisfiability (DPLL) used as a consistency check on charging rules.
     Implements the Davis-Putnam-Logemann-Loveland (DPLL) Algorithm for CNF SAT verification.
     """
 
