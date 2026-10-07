@@ -5,8 +5,8 @@ Write-Host ""
 
 $root = $PSScriptRoot
 
-Write-Host "[1/3] Starting FastAPI Backend on port 8000..." -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\backend'; python run.py"
+$pythonCmd = if (Test-Path "$root\backend\venv\Scripts\python.exe") { "$root\backend\venv\Scripts\python.exe" } else { "python" }
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\backend'; & '$pythonCmd' run.py"
 
 Write-Host "[2/3] Starting Vite Frontend on port 5173..." -ForegroundColor Green
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root\frontend'; npm run dev"

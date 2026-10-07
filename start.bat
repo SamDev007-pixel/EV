@@ -5,8 +5,11 @@ echo   Intelligent EV Charging ^& Resource Management System
 echo ========================================================
 echo.
 
-echo [1/3] Starting FastAPI Backend on port 8000...
-start "EV System - Backend (FastAPI)" cmd /k "cd /d %~dp0backend && python run.py"
+if exist "%~dp0backend\venv\Scripts\python.exe" (
+    start "EV System - Backend (FastAPI)" cmd /k "cd /d %~dp0backend && venv\Scripts\python.exe run.py"
+) else (
+    start "EV System - Backend (FastAPI)" cmd /k "cd /d %~dp0backend && python run.py"
+)
 
 echo [2/3] Starting Vite Frontend on port 5173...
 start "EV System - Frontend (Vite/React)" cmd /k "cd /d %~dp0frontend && npm run dev"
